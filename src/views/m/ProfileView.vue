@@ -58,7 +58,7 @@ const stats = computed(() => {
       </div>
     </div>
 
-    <div class="px-3 -mt-8">
+    <div class="px-3 -mt-[30px] relative z-10">
       <div class="bg-white rounded-2xl p-4 border border-ink-100 shadow-lift">
         <div class="text-xs text-ink-400 mb-1">本月已成交</div>
         <div class="text-2xl font-bold text-ink-900 mb-4">

@@ -21,3 +21,6 @@ vite.config.ts.timestamp-*.mjs
 mobile-*.png
 crm-*.png
 lsm-crm-*.png
+profile-*.png
+production-check.png
+final-profile-static.png
