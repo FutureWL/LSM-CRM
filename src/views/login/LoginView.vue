@@ -77,7 +77,7 @@ const admins = computed(() => usersStore.list.filter((u) => u.role === 'admin'))
             >📱 移动版</button>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             v-for="u in admins"
             :key="u.id"

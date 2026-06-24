@@ -22,7 +22,7 @@ function onTab(name: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-ink-50 max-w-md mx-auto shadow-lift">
+  <div class="flex flex-col h-screen w-full shrink-0 bg-ink-50 max-w-md mx-auto shadow-lift">
     <main class="flex-1 overflow-y-auto no-scrollbar safe-area-top">
       <RouterView v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -40,7 +40,10 @@ function onTab(name: string) {
       ＋
     </button>
 
-    <nav class="border-t border-ink-200 bg-white/80 backdrop-blur-md safe-area-bottom">
+    <nav
+      v-if="route.name !== 'm-visit-new'"
+      class="border-t border-ink-200 bg-white/80 backdrop-blur-md safe-area-bottom"
+    >
       <div class="grid grid-cols-4">
         <button
           v-for="t in tabs"

@@ -7,3 +7,17 @@ dist
 *.log
 .env
 .env.local
+
+# Playwright debug output
+.playwright-mcp/
+
+# pnpm store (when in repo, not the global one)
+.pnpm-store/
+
+# Vite temp files
+vite.config.ts.timestamp-*.mjs
+
+# Debug screenshots
+mobile-*.png
+crm-*.png
+lsm-crm-*.png
