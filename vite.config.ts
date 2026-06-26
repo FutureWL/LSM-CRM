@@ -32,10 +32,30 @@ export default defineConfig(({ mode }) => {
       open: shouldOpen,
       // dev 模式不要限制域名，方便任何来源访问（含 Docker host）
       ...(mode === 'development' ? { allowedHosts: true } : {}),
+      // ============ API 代理（同源转发，彻底避免 CORS）============
+      // 浏览器只跟 Vite 自己的 origin 打交道（无论 Vite 跑在 33500 / 52709 / 任何端口）
+      // /api/* 请求被 Vite 在服务端转发到后端 API（33501），浏览器侧无跨域
+      // 这要求 VITE_API_BASE_URL 设为相对路径（见下方 setApiBaseUrl 逻辑）
+      proxy: {
+        '/api': {
+          target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:33501',
+          changeOrigin: true,
+          // 可选：把后端的 Set-Cookie 转发回来（cookie 已经是 sameSite=lax，localhost 同源不需要）
+          // secure: false  // dev 模式不走 https
+        },
+      },
     },
     preview: {
       host: '0.0.0.0',
       port: Number(process.env.VITE_PORT ?? 33503),
+      // preview 模式（如 IDE 用 vite preview 预览构建产物）也加代理
+      // 让 preview 端口也能访问后端，避免 CORS
+      proxy: {
+        '/api': {
+          target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:33501',
+          changeOrigin: true,
+        },
+      },
     },
     build: {
       // 生产构建输出更整洁的目录结构

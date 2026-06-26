@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { db } from '../db/client'
 import { customers, customerTransfers, visits, users, type Customer } from '../db/schema'
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
-import { requireAuth } from '../auth/middleware'
+import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
 import { CUSTOMER_STAGES } from '../lib/stage'
@@ -35,7 +35,7 @@ function toCustomerDto(c: Customer) {
 }
 
 export const customersRoute = new Hono()
-  .get('/customers', requireAuth(), async (c) => {
+  .get('/customers', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
     const parsed = listQuery.safeParse(raw)
@@ -65,7 +65,7 @@ export const customersRoute = new Hono()
 
     return ok(c, { items: rows.map(toCustomerDto), page, limit, total })
   })
-  .get('/customers/:id', requireAuth(), async (c) => {
+  .get('/customers/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const id = c.req.param('id')
     const rows = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
@@ -104,7 +104,7 @@ export const customersRoute = new Hono()
       })),
     })
   })
-  .post('/customers', requireAuth(), async (c) => {
+  .post('/customers', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
@@ -150,7 +150,7 @@ export const customersRoute = new Hono()
     const row = inserted[0]!
     return ok(c, toCustomerDto(row), 201)
   })
-  .patch('/customers/:id', requireAuth(), async (c) => {
+  .patch('/customers/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const id = c.req.param('id')
     const existing = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
@@ -187,7 +187,7 @@ export const customersRoute = new Hono()
     const updated = await db.update(customers).set(patch).where(eq(customers.id, id)).returning()
     return ok(c, toCustomerDto(updated[0]!))
   })
-  .post('/customers/:id/transfer', requireAuth(), async (c) => {
+  .post('/customers/:id/transfer', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const id = c.req.param('id')
     const body = await c.req.json().catch(() => null)

@@ -22,6 +22,13 @@
       "when": 1782444955412,
       "tag": "0002_add_users_is_active",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782461470644,
+      "tag": "0003_heavy_gabe_jones",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { db } from '../db/client'
 import { users, type User } from '../db/schema'
 import { and, asc, eq, ne } from 'drizzle-orm'
-import { requireAuth } from '../auth/middleware'
+import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { hashPassword, verifyPassword } from '../auth/password'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
@@ -40,7 +40,7 @@ const patchSchema = z.object({
 })
 
 export const usersRoute = new Hono()
-  .get('/users', requireAuth(), async (c) => {
+  .get('/users', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
     // 默认隐藏已停用账号；?includeInactive=1 时返回全部
@@ -53,7 +53,7 @@ export const usersRoute = new Hono()
       .orderBy(asc(users.name))
     return ok(c, rows.map(publicView))
   })
-  .get('/users/sales', requireAuth(), async (c) => {
+  .get('/users/sales', requireAuthAndPasswordOk(), async (c) => {
     const rows = await db
       .select()
       .from(users)
@@ -61,14 +61,14 @@ export const usersRoute = new Hono()
       .orderBy(asc(users.name))
     return ok(c, rows.map(publicView))
   })
-  .get('/users/:id', requireAuth(), async (c) => {
+  .get('/users/:id', requireAuthAndPasswordOk(), async (c) => {
     const id = c.req.param('id')
     const rows = await db.select().from(users).where(eq(users.id, id)).limit(1)
     const u = rows[0]
     if (!u) throw new AppError('NOT_FOUND', 'User not found')
     return ok(c, publicView(u))
   })
-  .post('/users', requireAuth(), async (c) => {
+  .post('/users', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
     const body = await c.req.json().catch(() => null)
@@ -97,7 +97,7 @@ export const usersRoute = new Hono()
       .returning()
     return ok(c, publicView(inserted[0]!), 201)
   })
-  .patch('/users/:id', requireAuth(), async (c) => {
+  .patch('/users/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const id = c.req.param('id')
     const isSelf = me.id === id
@@ -152,7 +152,7 @@ export const usersRoute = new Hono()
     const updated = await db.update(users).set(patch).where(eq(users.id, id)).returning()
     return ok(c, publicView(updated[0]!))
   })
-  .delete('/users/:id', requireAuth(), async (c) => {
+  .delete('/users/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
     const id = c.req.param('id')

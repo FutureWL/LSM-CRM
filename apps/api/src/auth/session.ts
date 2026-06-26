@@ -4,21 +4,19 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { eq, lt } from 'drizzle-orm'
 import { db } from '../db/client'
 import { sessions } from '../db/schema'
-import { APP_ENV } from '../config/env'
+import { APP_ENV, IS_PROD_ENV } from '../config/env'
 
 // __Host- prefix requires: Secure flag, Path=/, no Domain attribute.
 // Together this guarantees the cookie is bound to the exact origin (no subdomain leakage).
-// In dev (HTTP localhost) we relax both:
-//   - COOKIE_INSECURE=1 disables Secure flag
-//   - this also requires dropping the __Host- prefix (Hono enforces the pair)
-// Production (HTTPS) MUST keep __Host- prefix for security.
-function cookieSecure(): boolean {
-  if (process.env.COOKIE_INSECURE === '1') return false
-  return true
-}
-
-export const SESSION_COOKIE = cookieSecure() ? '__Host-lsm_session' : 'lsm_session'
+// - 生产期 (HTTPS)：必须 __Host- 前缀（最高安全）
+// - 开发期 (HTTP localhost)：退化为普通 cookie 名 + 不设 Secure
+export const SESSION_COOKIE = APP_ENV.cookieSecure ? '__Host-lsm_session' : 'lsm_session'
 export const SESSION_TTL_SEC = 60 * 60 * 24 * 7 // 7 days
+
+// 生产期一旦发现 dev 模式却启用了 Secure + __Host-，会启动失败；这里仅打印告警
+if (IS_PROD_ENV && !APP_ENV.cookieSecure) {
+  console.warn('[session] ⚠️  生产环境 cookieSecure=false，session cookie 可能在 HTTPS 下不发送')
+}
 
 /** Raw bearer token (sent to client as cookie). 32 bytes base64url. */
 function newRawToken(): string {
@@ -72,8 +70,9 @@ export async function purgeExpiredSessions() {
 export function setSessionCookie(c: Context, rawToken: string) {
   setCookie(c, SESSION_COOKIE, rawToken, {
     httpOnly: true,
-    sameSite: 'Lax',
-    secure: cookieSecure(),
+    // 生产用 Strict（最强防 CSRF）；dev 用 Lax（保证本地调试跳转能带 cookie）
+    sameSite: IS_PROD_ENV ? 'Strict' : 'Lax',
+    secure: APP_ENV.cookieSecure,
     path: '/',
     maxAge: SESSION_TTL_SEC,
   })

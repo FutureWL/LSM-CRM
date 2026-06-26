@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { db } from '../db/client'
 import { visits, customers, type Visit } from '../db/schema'
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm'
-import { requireAuth } from '../auth/middleware'
+import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
 import { CUSTOMER_STAGES, VISIT_TYPES, VISIT_RESULTS } from '../lib/stage'
@@ -35,7 +35,7 @@ function toVisitDto(v: Visit) {
 }
 
 export const visitsRoute = new Hono()
-  .get('/visits', requireAuth(), async (c) => {
+  .get('/visits', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
     const parsed = listQuery.safeParse(raw)
@@ -59,7 +59,7 @@ export const visitsRoute = new Hono()
       .offset(offset)
     return ok(c, { items: rows.map(toVisitDto), page, limit })
   })
-  .post('/visits', requireAuth(), async (c) => {
+  .post('/visits', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
@@ -112,7 +112,7 @@ export const visitsRoute = new Hono()
       return ok(c, toVisitDto(row), 201)
     })
   })
-  .delete('/visits/:id', requireAuth(), async (c) => {
+  .delete('/visits/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
     const id = c.req.param('id')
     const existingRows = await db.select().from(visits).where(eq(visits.id, id)).limit(1)
