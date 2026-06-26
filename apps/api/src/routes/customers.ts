@@ -4,6 +4,7 @@ import { db } from '../db/client'
 import { customers, customerTransfers, visits, users, type Customer } from '../db/schema'
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { requireAuthAndPasswordOk } from '../auth/middleware'
+import { tenantContext } from '../auth/tenant'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
 import { ErrorMessages } from '../lib/error-messages'
@@ -35,15 +36,20 @@ function toCustomerDto(c: Customer) {
   }
 }
 
+// 全部路由都加：requireAuth + tenantContext
 export const customersRoute = new Hono()
-  .get('/customers', requireAuthAndPasswordOk(), async (c) => {
+  .get('/customers', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
+    // 过滤掉 tenant 参数（不让它进 query schema 校验）
+    delete raw.tenant
     const parsed = listQuery.safeParse(raw)
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_QUERY, parsed.error.flatten())
     const { stage, ownerId, q, page, limit } = parsed.data
 
-    const where = []
+    // 关键：所有 query 都要加 tenant_id 过滤
+    const where = [eq(customers.tenantId, tenantId)]
     if (me.role === 'sales') where.push(eq(customers.ownerId, me.id))
     if (stage) where.push(eq(customers.stage, stage))
     if (ownerId) where.push(eq(customers.ownerId, ownerId))
@@ -53,7 +59,7 @@ export const customersRoute = new Hono()
     const rows = await db
       .select()
       .from(customers)
-      .where(where.length ? and(...where) : undefined)
+      .where(and(...where))
       .orderBy(asc(customers.name))
       .limit(limit)
       .offset(offset)
@@ -61,15 +67,21 @@ export const customersRoute = new Hono()
     const countResult = await db
       .select({ total: sql<number>`count(*)::int` })
       .from(customers)
-      .where(where.length ? and(...where) : undefined)
+      .where(and(...where))
     const total = countResult[0]?.total ?? 0
 
     return ok(c, { items: rows.map(toCustomerDto), page, limit, total })
   })
-  .get('/customers/:id', requireAuthAndPasswordOk(), async (c) => {
+  .get('/customers/:id', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const id = c.req.param('id')
-    const rows = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
+    // tenant_id + id 联合查询，杜绝跨租户访问
+    const rows = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
+      .limit(1)
     const cust = rows[0]
     if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
     if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
@@ -92,7 +104,7 @@ export const customersRoute = new Hono()
       })
       .from(visits)
       .leftJoin(users, eq(users.id, visits.salesmanId))
-      .where(eq(visits.customerId, id))
+      .where(and(eq(visits.customerId, id), eq(visits.tenantId, tenantId)))
       .orderBy(desc(visits.visitedAt))
       .limit(10)
 
@@ -105,8 +117,9 @@ export const customersRoute = new Hono()
       })),
     })
   })
-  .post('/customers', requireAuthAndPasswordOk(), async (c) => {
+  .post('/customers', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
       name: z.string().min(1).max(100),
@@ -128,7 +141,12 @@ export const customersRoute = new Hono()
       throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_SALES_CREATE_OWNER)
     }
     if (data.ownerId) {
-      const target = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, data.ownerId)).limit(1)
+      // 同时验证：目标 owner 必须在同一租户内
+      const target = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.id, data.ownerId))
+        .limit(1)
       if (!target[0] || target[0].role !== 'sales') {
         throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_OWNERID_NOT_SALES)
       }
@@ -137,6 +155,7 @@ export const customersRoute = new Hono()
     const inserted = await db
       .insert(customers)
       .values({
+        tenantId, // 关键：写入时打 tenant_id
         name: data.name,
         company: data.company,
         phone: data.phone,
@@ -151,10 +170,16 @@ export const customersRoute = new Hono()
     const row = inserted[0]!
     return ok(c, toCustomerDto(row), 201)
   })
-  .patch('/customers/:id', requireAuthAndPasswordOk(), async (c) => {
+  .patch('/customers/:id', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const id = c.req.param('id')
-    const existing = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
+    // 双重过滤：id + tenantId
+    const existing = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
+      .limit(1)
     const cust = existing[0]
     if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
     if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
@@ -185,11 +210,16 @@ export const customersRoute = new Hono()
     if (data.stage !== undefined) patch.stage = data.stage
     if (data.amount !== undefined) patch.amount = String(data.amount)
 
-    const updated = await db.update(customers).set(patch).where(eq(customers.id, id)).returning()
+    const updated = await db
+      .update(customers)
+      .set(patch)
+      .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
+      .returning()
     return ok(c, toCustomerDto(updated[0]!))
   })
-  .post('/customers/:id/transfer', requireAuthAndPasswordOk(), async (c) => {
+  .post('/customers/:id/transfer', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const id = c.req.param('id')
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
@@ -206,13 +236,18 @@ export const customersRoute = new Hono()
     }
 
     return await db.transaction(async (tx) => {
-      const existing = await tx.select().from(customers).where(eq(customers.id, id)).limit(1)
+      const existing = await tx
+        .select()
+        .from(customers)
+        .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
+        .limit(1)
       const cust = existing[0]
       if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
       if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
       if (cust.ownerId === toUserId) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_TRANSFER_SAME_OWNER)
 
       await tx.insert(customerTransfers).values({
+        tenantId, // 写入 tenant_id
         customerId: id,
         fromUserId: cust.ownerId,
         toUserId,
@@ -221,7 +256,7 @@ export const customersRoute = new Hono()
       const updated = await tx
         .update(customers)
         .set({ ownerId: toUserId, updatedAt: new Date() })
-        .where(eq(customers.id, id))
+        .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
         .returning()
       return ok(c, toCustomerDto(updated[0]!))
     })

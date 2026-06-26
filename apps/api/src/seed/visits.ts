@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker/locale/zh_CN'
 import { db } from '../db/client'
 import { visits, customers } from '../db/schema'
+import { DEFAULT_TENANT_ID } from '../lib/tenant-constants'
 
 const PER_CUSTOMER = { min: 2, max: 6 }
 
@@ -45,6 +46,7 @@ export async function seedVisits(): Promise<number> {
       const stageBefore = faker.helpers.arrayElement(STAGES)
       const stageAfter = faker.helpers.arrayElement(STAGES)
       allRows.push({
+        tenantId: DEFAULT_TENANT_ID,
         customerId: cust.id,
         salesmanId: cust.ownerId,
         type: faker.helpers.arrayElement(TYPES),

@@ -4,6 +4,7 @@ import { db } from '../db/client'
 import { visits, customers, type Visit } from '../db/schema'
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm'
 import { requireAuthAndPasswordOk } from '../auth/middleware'
+import { tenantContext } from '../auth/tenant'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
 import { ErrorMessages } from '../lib/error-messages'
@@ -36,14 +37,16 @@ function toVisitDto(v: Visit) {
 }
 
 export const visitsRoute = new Hono()
-  .get('/visits', requireAuthAndPasswordOk(), async (c) => {
+  .get('/visits', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
+    delete raw.tenant
     const parsed = listQuery.safeParse(raw)
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_QUERY, parsed.error.flatten())
     const { customerId, salesmanId, from, to, page, limit } = parsed.data
 
-    const where = [isNull(visits.deletedAt)]
+    const where = [isNull(visits.deletedAt), eq(visits.tenantId, tenantId)]
     if (me.role === 'sales') where.push(eq(visits.salesmanId, me.id))
     if (customerId) where.push(eq(visits.customerId, customerId))
     if (salesmanId && me.role === 'admin') where.push(eq(visits.salesmanId, salesmanId))
@@ -60,8 +63,9 @@ export const visitsRoute = new Hono()
       .offset(offset)
     return ok(c, { items: rows.map(toVisitDto), page, limit })
   })
-  .post('/visits', requireAuthAndPasswordOk(), async (c) => {
+  .post('/visits', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
       customerId: z.string().uuid(),
@@ -79,7 +83,12 @@ export const visitsRoute = new Hono()
     const data = parsed.data
 
     return await db.transaction(async (tx) => {
-      const custRows = await tx.select().from(customers).where(eq(customers.id, data.customerId)).limit(1)
+      // 验证客户存在且属于当前租户
+      const custRows = await tx
+        .select()
+        .from(customers)
+        .where(and(eq(customers.id, data.customerId), eq(customers.tenantId, tenantId)))
+        .limit(1)
       const cust = custRows[0]
       if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
       if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
@@ -87,6 +96,7 @@ export const visitsRoute = new Hono()
       const inserted = await tx
         .insert(visits)
         .values({
+          tenantId, // 写入 tenant_id
           customerId: data.customerId,
           salesmanId: me.id,
           type: data.type,
@@ -108,21 +118,32 @@ export const visitsRoute = new Hono()
       if (data.stageAfter && data.stageAfter !== cust.stage) {
         updates.stage = data.stageAfter
       }
-      await tx.update(customers).set(updates).where(eq(customers.id, data.customerId))
+      await tx
+        .update(customers)
+        .set(updates)
+        .where(and(eq(customers.id, data.customerId), eq(customers.tenantId, tenantId)))
 
       return ok(c, toVisitDto(row), 201)
     })
   })
-  .delete('/visits/:id', requireAuthAndPasswordOk(), async (c) => {
+  .delete('/visits/:id', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     const id = c.req.param('id')
-    const existingRows = await db.select().from(visits).where(eq(visits.id, id)).limit(1)
+    const existingRows = await db
+      .select()
+      .from(visits)
+      .where(and(eq(visits.id, id), eq(visits.tenantId, tenantId)))
+      .limit(1)
     const existing = existingRows[0]
     if (!existing) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_VISIT_NOT_FOUND)
     if (existing.deletedAt) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_VISIT_ALREADY_DELETED)
     if (me.role !== 'admin' && existing.salesmanId !== me.id) {
       throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_VISIT)
     }
-    await db.update(visits).set({ deletedAt: new Date() }).where(eq(visits.id, id))
+    await db
+      .update(visits)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(visits.id, id), eq(visits.tenantId, tenantId)))
     return ok(c, { deleted: true, id })
   })

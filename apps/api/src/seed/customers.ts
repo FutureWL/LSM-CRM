@@ -2,6 +2,7 @@ import { faker } from '@faker-js/faker/locale/zh_CN'
 import { db } from '../db/client'
 import { customers, users } from '../db/schema'
 import { sql } from 'drizzle-orm'
+import { DEFAULT_TENANT_ID } from '../lib/tenant-constants'
 
 const TARGET = 80
 const STAGE_DIST: Array<{ stage: string; n: number }> = [
@@ -30,6 +31,7 @@ export async function seedCustomers(): Promise<number> {
       const owner = salesUsers[faker.number.int({ min: 0, max: salesUsers.length - 1 })]!
       const company = faker.company.name()
       rows.push({
+        tenantId: DEFAULT_TENANT_ID,
         name: faker.person.lastName() + faker.person.firstName().charAt(0),
         company,
         phone: faker.phone.number({ style: 'national' }),

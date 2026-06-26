@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { db } from '../db/client'
-import { users, type User } from '../db/schema'
+import { users, tenantMemberships, type User } from '../db/schema'
 import { and, asc, eq, ne } from 'drizzle-orm'
 import { requireAuthAndPasswordOk } from '../auth/middleware'
+import { tenantContext } from '../auth/tenant'
 import { hashPassword, verifyPassword } from '../auth/password'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
@@ -41,29 +42,54 @@ const patchSchema = z.object({
 })
 
 export const usersRoute = new Hono()
-  .get('/users', requireAuthAndPasswordOk(), async (c) => {
+  .get('/users', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
     const me = c.get('user')
+    const tenantId = c.get('tenantId')
     if (me.role !== 'admin') throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_ADMIN_ONLY)
-    // 默认隐藏已停用账号；?includeInactive=1 时返回全部
+    // 限定为当前租户成员。默认隐藏已停用账号；?includeInactive=1 时返回全部
     const includeInactive = c.req.query('includeInactive') === '1'
-    const where = includeInactive ? undefined : eq(users.isActive, true)
     const rows = await db
-      .select()
-      .from(users)
-      .where(where)
+      .select({ u: users })
+      .from(tenantMemberships)
+      .innerJoin(users, eq(users.id, tenantMemberships.userId))
+      .where(
+        and(
+          eq(tenantMemberships.tenantId, tenantId),
+          includeInactive
+            ? eq(tenantMemberships.status, 'active')
+            : and(eq(tenantMemberships.status, 'active'), eq(users.isActive, true)),
+        ),
+      )
       .orderBy(asc(users.name))
-    return ok(c, rows.map(publicView))
+    return ok(c, rows.map((r) => publicView(r.u)))
   })
-  .get('/users/sales', requireAuthAndPasswordOk(), async (c) => {
+  .get('/users/sales', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
+    const tenantId = c.get('tenantId')
     const rows = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.role, 'sales'), eq(users.isActive, true)))
+      .select({ u: users })
+      .from(tenantMemberships)
+      .innerJoin(users, eq(users.id, tenantMemberships.userId))
+      .where(
+        and(
+          eq(tenantMemberships.tenantId, tenantId),
+          eq(users.role, 'sales'),
+          eq(users.isActive, true),
+          eq(tenantMemberships.status, 'active'),
+        ),
+      )
       .orderBy(asc(users.name))
-    return ok(c, rows.map(publicView))
+    return ok(c, rows.map((r) => publicView(r.u)))
   })
-  .get('/users/:id', requireAuthAndPasswordOk(), async (c) => {
+  .get('/users/:id', requireAuthAndPasswordOk(), tenantContext(), async (c) => {
+    const tenantId = c.get('tenantId')
     const id = c.req.param('id')
+    // 验证该用户是否属于当前租户
+    const m = await db
+      .select({ id: tenantMemberships.id })
+      .from(tenantMemberships)
+      .where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.userId, id)))
+      .limit(1)
+    if (!m[0]) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_USER_NOT_FOUND)
     const rows = await db.select().from(users).where(eq(users.id, id)).limit(1)
     const u = rows[0]
     if (!u) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_USER_NOT_FOUND)

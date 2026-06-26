@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { db } from '../db/client'
-import { users } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { users, tenantMemberships, tenants } from '../db/schema'
+import { and, asc, eq } from 'drizzle-orm'
 import { hashPassword, verifyPassword } from '../auth/password'
 import { checkPasswordStrength } from '../auth/password-policy'
 import {
@@ -39,6 +39,24 @@ function publicUser(u: typeof users.$inferSelect) {
   }
 }
 
+/**
+ * 用户名下的租户列表（含角色），登录时返回
+ */
+async function listUserTenants(userId: string) {
+  return db
+    .select({
+      id: tenants.id,
+      name: tenants.name,
+      slug: tenants.slug,
+      role: tenantMemberships.role,
+      status: tenantMemberships.status,
+    })
+    .from(tenantMemberships)
+    .innerJoin(tenants, eq(tenants.id, tenantMemberships.tenantId))
+    .where(and(eq(tenantMemberships.userId, userId), eq(tenants.status, 'active')))
+    .orderBy(asc(tenants.name))
+}
+
 export const auth = new Hono()
   .post('/auth/login', async (c) => {
     const body = await c.req.json().catch(() => null)
@@ -55,7 +73,8 @@ export const auth = new Hono()
     }
     const { rawToken } = await createSession(user.id, c.req.header('user-agent') ?? undefined)
     setSessionCookie(c, rawToken)
-    return ok(c, publicUser(user))
+    const tenants = await listUserTenants(user.id)
+    return ok(c, { ...publicUser(user), tenants })
   })
   .post('/auth/logout', async (c) => {
     const raw = getSessionCookie(c)
@@ -63,9 +82,10 @@ export const auth = new Hono()
     clearSessionCookie(c)
     return ok(c, { loggedOut: true })
   })
-  .get('/auth/me', requireAuth(), (c) => {
+  .get('/auth/me', requireAuth(), async (c) => {
     const u = c.get('user')
-    return ok(c, publicUser(u))
+    const tenants = await listUserTenants(u.id)
+    return ok(c, { ...publicUser(u), tenants })
   })
   /**
    * 修改密码。无需提供 currentPassword 时也可调用（用于强制改密流程）。
