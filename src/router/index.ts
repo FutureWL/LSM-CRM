@@ -21,6 +21,13 @@ const router = createRouter({
       component: () => import('@/views/login/LoginView.vue'),
       meta: { public: true },
     },
+    {
+      // 强制改密页：未改密用户唯一可访问的页面（除登录页外）
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('@/views/login/ForceChangePasswordView.vue'),
+      meta: { requiresAuth: true, public: true },
+    },
     // 移动端销售
     {
       path: '/m',
@@ -159,13 +166,19 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // 2) 角色检查
+  // 2) 强制改密：未改密用户只能访问 /change-password（以及 /login、/auth/logout）
+  //    防止绕过：就算手动在地址栏输 /admin/dashboard 也会被拦回
+  if (auth.mustChangePassword && to.name !== 'change-password') {
+    return { path: '/change-password' }
+  }
+
+  // 3) 角色检查
   const requiredRole = to.meta.role as 'admin' | 'sales' | undefined
   if (requiredRole && auth.role !== requiredRole) {
     return auth.isAdmin ? '/admin/dashboard' : '/m/home'
   }
 
-  // 3) 进入受保护路由前预加载常用数据（首屏不白屏）
+  // 4) 进入受保护路由前预加载常用数据（首屏不白屏）
   //    不阻塞导航；fire-and-forget，view 内部会 reactive 跟随
   const users = useUsersStore()
   const customers = useCustomersStore()

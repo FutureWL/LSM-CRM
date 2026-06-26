@@ -26,3 +26,18 @@ export async function fetchMe(): Promise<User | null> {
     return null
   }
 }
+
+/**
+ * 修改自己的密码。
+ * - 主动修改：传 currentPassword + newPassword
+ * - 强制改密（首登/重置）：只传 newPassword
+ */
+export async function changePassword(
+  newPassword: string,
+  currentPassword?: string,
+): Promise<void> {
+  await api.post('/auth/change-password', {
+    newPassword,
+    ...(currentPassword ? { currentPassword } : {}),
+  })
+}

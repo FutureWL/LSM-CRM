@@ -28,6 +28,11 @@ async function submit() {
   submitting.value = true
   try {
     await auth.login(email.value.trim(), password.value)
+    // 必须改密：先跳强制改密页
+    if (auth.mustChangePassword) {
+      router.push('/change-password')
+      return
+    }
     const redirect = (route.query.redirect as string) || targetAfterLogin.value
     router.push(redirect)
   } catch (err) {

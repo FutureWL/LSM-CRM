@@ -33,6 +33,7 @@ export function dtoToUser(dto: UserDto): User {
     role: dto.role,
     avatar: dto.avatarUrl ?? avatarFromName(dto.name),
     title: dto.role === 'admin' ? '管理员' : '销售',
+    mustChangePassword: dto.mustChangePassword,
   }
 }
 

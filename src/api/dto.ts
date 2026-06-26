@@ -11,6 +11,8 @@ export interface UserDto {
   avatarUrl: string | null
   isActive: boolean
   createdAt: string
+  /** 是否必须修改密码（首登 / 管理员重置后） */
+  mustChangePassword: boolean
 }
 
 // 后端 UserDto 的精简版（用于 /auth/me 等只返回基本信息的场景）
@@ -20,6 +22,8 @@ export interface AuthUserDto {
   email: string
   role: UserRole
   avatarUrl: string | null
+  /** 是否必须修改密码（首登 / 管理员重置后） */
+  mustChangePassword: boolean
 }
 
 export type CustomerStage =

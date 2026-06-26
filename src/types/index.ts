@@ -7,8 +7,11 @@ export interface User {
   name: string
   role: UserRole
   avatar: string
+  email?: string
   team?: string
   title?: string
+  /** 是否必须修改密码（首登 / 管理员重置后） */
+  mustChangePassword?: boolean
 }
 
 // 客户阶段:new → contacted → intent → negotiating → won / lost

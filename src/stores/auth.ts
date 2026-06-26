@@ -21,6 +21,11 @@ export const useAuthStore = defineStore(
     const role = computed(() => currentUser.value?.role ?? null)
     const isAdmin = computed(() => role.value === 'admin')
     const isSales = computed(() => role.value === 'sales')
+    /**
+     * 是否必须修改密码。
+     * true 时：路由守卫会跳 /change-password 页面，用户无法访问其他任何路由。
+     */
+    const mustChangePassword = computed(() => currentUser.value?.mustChangePassword === true)
 
     async function login(email: string, password: string) {
       loading.value = true
@@ -77,6 +82,31 @@ export const useAuthStore = defineStore(
       }
     }
 
+    /**
+     * 修改密码（专用接口 /auth/change-password）
+     * - 主动修改：传 currentPassword
+     * - 强制改密（首登/重置）：不传 currentPassword
+     * 成功后本地 currentUser.mustChangePassword 置 false，无需重新拉 user
+     */
+    async function changePassword(newPassword: string, currentPassword?: string): Promise<void> {
+      if (!currentUser.value) throw new Error('未登录')
+      loading.value = true
+      lastError.value = null
+      try {
+        const { AuthApi } = await import('@/api')
+        await AuthApi.changePassword(newPassword, currentPassword)
+        // 本地更新 mustChangePassword 标志
+        if (currentUser.value) {
+          currentUser.value = { ...currentUser.value, mustChangePassword: false }
+        }
+      } catch (err) {
+        lastError.value = err instanceof Error ? err.message : '修改密码失败'
+        throw err
+      } finally {
+        loading.value = false
+      }
+    }
+
     return {
       currentUserId,
       currentUser,
@@ -86,11 +116,13 @@ export const useAuthStore = defineStore(
       role,
       isAdmin,
       isSales,
+      mustChangePassword,
       login,
       logout,
       clear,
       bootstrap,
       changeOwnPassword,
+      changePassword,
     }
   },
   {
