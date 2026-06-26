@@ -1,5 +1,6 @@
-import { pgTable, text, uuid, timestamp, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, timestamp, boolean, index } from 'drizzle-orm/pg-core'
 import { userRoleEnum } from './enums'
+import { tenants } from './tenants'
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -19,6 +20,14 @@ export const users = pgTable('users', {
    * 最后修改密码时间。用于未来密码过期策略（v0.5+）。
    */
   passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+  /**
+   * 上次活跃租户。Sass / 内部 20 销售通常一个用户一个租户，
+   * 但架构上允许一个用户属于多个租户（多公司销售代理等场景）。
+   * 登录时若 query 传 ?tenant=xxx，会更新此字段。
+   */
+  lastActiveTenantId: uuid('last_active_tenant_id').references(() => tenants.id, {
+    onDelete: 'set null',
+  }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
