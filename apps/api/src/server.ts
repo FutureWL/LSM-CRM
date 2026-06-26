@@ -3,6 +3,7 @@ import { requestId } from './middleware/request-id'
 import { logger } from './middleware/logger'
 import { corsMiddleware } from './middleware/cors'
 import { onError } from './middleware/error'
+import { ErrorMessages } from './lib/error-messages'
 import { routes } from './routes'
 
 const app = new Hono()
@@ -18,7 +19,7 @@ app.onError(onError)
 
 app.notFound((c) =>
   c.json(
-    { ok: false, data: null, error: { code: 'NOT_FOUND', message: `Route not found: ${c.req.method} ${c.req.path}` } },
+    { ok: false, data: null, error: { code: 'NOT_FOUND', message: ErrorMessages.NOT_FOUND(c.req.method, c.req.path) } },
     404,
   ),
 )

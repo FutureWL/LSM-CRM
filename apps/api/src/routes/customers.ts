@@ -6,6 +6,7 @@ import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
+import { ErrorMessages } from '../lib/error-messages'
 import { CUSTOMER_STAGES } from '../lib/stage'
 
 const listQuery = z.object({
@@ -39,7 +40,7 @@ export const customersRoute = new Hono()
     const me = c.get('user')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
     const parsed = listQuery.safeParse(raw)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid query', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_QUERY, parsed.error.flatten())
     const { stage, ownerId, q, page, limit } = parsed.data
 
     const where = []
@@ -70,8 +71,8 @@ export const customersRoute = new Hono()
     const id = c.req.param('id')
     const rows = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
     const cust = rows[0]
-    if (!cust) throw new AppError('NOT_FOUND', 'Customer not found')
-    if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', 'Not your customer')
+    if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
+    if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
 
     const recentVisits = await db
       .select({
@@ -119,17 +120,17 @@ export const customersRoute = new Hono()
       ownerId: z.string().uuid().optional(),
     })
     const parsed = schema.safeParse(body)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     const data = parsed.data
 
     const ownerId = data.ownerId ?? me.id
     if (me.role === 'sales' && ownerId !== me.id) {
-      throw new AppError('FORBIDDEN', 'Sales can only create customers for self')
+      throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_SALES_CREATE_OWNER)
     }
     if (data.ownerId) {
       const target = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, data.ownerId)).limit(1)
       if (!target[0] || target[0].role !== 'sales') {
-        throw new AppError('VALIDATION_ERROR', 'ownerId must reference a sales user')
+        throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_OWNERID_NOT_SALES)
       }
     }
 
@@ -155,8 +156,8 @@ export const customersRoute = new Hono()
     const id = c.req.param('id')
     const existing = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
     const cust = existing[0]
-    if (!cust) throw new AppError('NOT_FOUND', 'Customer not found')
-    if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', 'Not your customer')
+    if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
+    if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
 
     const body = await c.req.json().catch(() => null)
     const schema = z.object({
@@ -170,9 +171,9 @@ export const customersRoute = new Hono()
       amount: z.number().nonnegative().optional(),
     })
     const parsed = schema.safeParse(body)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     const data = parsed.data
-    if (Object.keys(data).length === 0) throw new AppError('VALIDATION_ERROR', 'No fields to update')
+    if (Object.keys(data).length === 0) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_NO_FIELDS_TO_UPDATE)
 
     const patch: Record<string, unknown> = { updatedAt: new Date() }
     if (data.name !== undefined) patch.name = data.name
@@ -196,20 +197,20 @@ export const customersRoute = new Hono()
       reason: z.string().max(500).optional(),
     })
     const parsed = schema.safeParse(body)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     const { toUserId, reason } = parsed.data
 
     const target = await db.select().from(users).where(eq(users.id, toUserId)).limit(1)
     if (!target[0] || target[0].role !== 'sales') {
-      throw new AppError('VALIDATION_ERROR', 'Target user must be a sales user')
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_TRANSFER_TARGET_INVALID)
     }
 
     return await db.transaction(async (tx) => {
       const existing = await tx.select().from(customers).where(eq(customers.id, id)).limit(1)
       const cust = existing[0]
-      if (!cust) throw new AppError('NOT_FOUND', 'Customer not found')
-      if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', 'Not your customer')
-      if (cust.ownerId === toUserId) throw new AppError('VALIDATION_ERROR', 'Already owned by target user')
+      if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
+      if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
+      if (cust.ownerId === toUserId) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_TRANSFER_SAME_OWNER)
 
       await tx.insert(customerTransfers).values({
         customerId: id,

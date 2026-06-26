@@ -3,6 +3,7 @@ import { db } from '../db/client'
 import { users, type User } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { fail } from '../lib/response'
+import { ErrorMessages } from '../lib/error-messages'
 import { getSessionCookie, getSession } from './session'
 
 declare module 'hono' {
@@ -14,12 +15,12 @@ declare module 'hono' {
 export function requireAuth(): MiddlewareHandler {
   return async (c, next) => {
     const raw = getSessionCookie(c)
-    if (!raw) return fail(c, 'UNAUTHORIZED', 'No session', 401)
+    if (!raw) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_NO_SESSION, 401)
     const session = await getSession(raw)
-    if (!session) return fail(c, 'UNAUTHORIZED', 'Session expired or invalid', 401)
+    if (!session) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_SESSION_EXPIRED, 401)
     const rows = await db.select().from(users).where(eq(users.id, session.userId)).limit(1)
     const user = rows[0]
-    if (!user) return fail(c, 'UNAUTHORIZED', 'User not found', 401)
+    if (!user) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_USER_NOT_FOUND, 401)
     c.set('user', user)
     await next()
   }
@@ -28,8 +29,8 @@ export function requireAuth(): MiddlewareHandler {
 export function requireRole(role: 'admin' | 'sales'): MiddlewareHandler {
   return async (c, next) => {
     const user = c.get('user')
-    if (!user) return fail(c, 'UNAUTHORIZED', 'Auth required', 401)
-    if (user.role !== role) return fail(c, 'FORBIDDEN', `Requires role: ${role}`, 403)
+    if (!user) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_NO_SESSION, 401)
+    if (user.role !== role) return fail(c, 'FORBIDDEN', `无权操作，需要角色: ${role}`, 403)
     await next()
   }
 }
@@ -51,12 +52,12 @@ export function requireAuthAndPasswordOk(): MiddlewareHandler {
   return async (c, next) => {
     // 先跑 requireAuth 逻辑
     const raw = getSessionCookie(c)
-    if (!raw) return fail(c, 'UNAUTHORIZED', 'No session', 401)
+    if (!raw) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_NO_SESSION, 401)
     const session = await getSession(raw)
-    if (!session) return fail(c, 'UNAUTHORIZED', 'Session expired or invalid', 401)
+    if (!session) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_SESSION_EXPIRED, 401)
     const rows = await db.select().from(users).where(eq(users.id, session.userId)).limit(1)
     const user = rows[0]
-    if (!user) return fail(c, 'UNAUTHORIZED', 'User not found', 401)
+    if (!user) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_USER_NOT_FOUND, 401)
     c.set('user', user)
 
     // 再校验改密

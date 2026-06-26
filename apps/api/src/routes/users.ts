@@ -7,6 +7,7 @@ import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { hashPassword, verifyPassword } from '../auth/password'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
+import { ErrorMessages } from '../lib/error-messages'
 
 function publicView(u: User) {
   return {
@@ -42,7 +43,7 @@ const patchSchema = z.object({
 export const usersRoute = new Hono()
   .get('/users', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
-    if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
+    if (me.role !== 'admin') throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_ADMIN_ONLY)
     // 默认隐藏已停用账号；?includeInactive=1 时返回全部
     const includeInactive = c.req.query('includeInactive') === '1'
     const where = includeInactive ? undefined : eq(users.isActive, true)
@@ -65,16 +66,16 @@ export const usersRoute = new Hono()
     const id = c.req.param('id')
     const rows = await db.select().from(users).where(eq(users.id, id)).limit(1)
     const u = rows[0]
-    if (!u) throw new AppError('NOT_FOUND', 'User not found')
+    if (!u) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_USER_NOT_FOUND)
     return ok(c, publicView(u))
   })
   .post('/users', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
-    if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
+    if (me.role !== 'admin') throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_ADMIN_ONLY)
     const body = await c.req.json().catch(() => null)
     const parsed = createSchema.safeParse(body)
     if (!parsed.success) {
-      throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     }
     const data = parsed.data
     const emailLower = data.email.toLowerCase()
@@ -83,7 +84,7 @@ export const usersRoute = new Hono()
       .from(users)
       .where(eq(users.email, emailLower))
       .limit(1)
-    if (existing[0]) throw new AppError('CONFLICT', 'Email already in use')
+    if (existing[0]) throw new AppError('CONFLICT', '该邮箱已被使用')
     const passwordHash = await hashPassword(data.password)
     const inserted = await db
       .insert(users)
@@ -102,43 +103,43 @@ export const usersRoute = new Hono()
     const id = c.req.param('id')
     const isSelf = me.id === id
     const isAdmin = me.role === 'admin'
-    if (!isSelf && !isAdmin) throw new AppError('FORBIDDEN', 'Cannot modify other users')
+    if (!isSelf && !isAdmin) throw new AppError('FORBIDDEN', '无权修改其他用户')
 
     const body = await c.req.json().catch(() => null)
     const parsed = patchSchema.safeParse(body)
     if (!parsed.success) {
-      throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     }
     const data = parsed.data
     if (Object.keys(data).length === 0) {
-      throw new AppError('VALIDATION_ERROR', 'No fields to update')
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_NO_FIELDS_TO_UPDATE)
     }
 
     const existingRows = await db.select().from(users).where(eq(users.id, id)).limit(1)
     const existing = existingRows[0]
-    if (!existing) throw new AppError('NOT_FOUND', 'User not found')
+    if (!existing) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_USER_NOT_FOUND)
 
     // 权限边界
     if (!isAdmin) {
       // 自己只能改 name + 自己密码（带 currentPassword）
-      if (data.role !== undefined) throw new AppError('FORBIDDEN', 'Cannot change role')
-      if (data.email !== undefined) throw new AppError('FORBIDDEN', 'Cannot change email')
-      if (data.isActive !== undefined) throw new AppError('FORBIDDEN', 'Cannot change active status')
+      if (data.role !== undefined) throw new AppError('FORBIDDEN', '无权修改角色')
+      if (data.email !== undefined) throw new AppError('FORBIDDEN', '无权修改邮箱')
+      if (data.isActive !== undefined) throw new AppError('FORBIDDEN', '无权修改启用状态')
       if (data.password !== undefined) {
         if (!data.currentPassword) {
-          throw new AppError('VALIDATION_ERROR', 'currentPassword required to change own password')
+          throw new AppError('VALIDATION_ERROR', '修改自己的密码必须提供当前密码')
         }
         const okPw = await verifyPassword(existing.passwordHash, data.currentPassword)
-        if (!okPw) throw new AppError('UNAUTHORIZED', 'Current password incorrect')
+        if (!okPw) throw new AppError('UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_CURRENT_PASSWORD)
       }
     } else {
       // admin 不能通过 PATCH 把自己降级（防自杀）
       if (isSelf && data.role !== undefined && data.role !== 'admin') {
-        throw new AppError('VALIDATION_ERROR', 'Admin cannot demote self')
+        throw new AppError('VALIDATION_ERROR', '管理员不能取消自己的管理员身份')
       }
       // admin 不能停用自己
       if (isSelf && data.isActive === false) {
-        throw new AppError('VALIDATION_ERROR', 'Admin cannot deactivate self')
+        throw new AppError('VALIDATION_ERROR', '管理员不能停用自己的账号')
       }
     }
 
@@ -154,12 +155,12 @@ export const usersRoute = new Hono()
   })
   .delete('/users/:id', requireAuthAndPasswordOk(), async (c) => {
     const me = c.get('user')
-    if (me.role !== 'admin') throw new AppError('FORBIDDEN', 'Admin only')
+    if (me.role !== 'admin') throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_ADMIN_ONLY)
     const id = c.req.param('id')
-    if (me.id === id) throw new AppError('VALIDATION_ERROR', 'Cannot delete self')
+    if (me.id === id) throw new AppError('VALIDATION_ERROR', '不能删除自己的账号')
 
     const existing = await db.select().from(users).where(eq(users.id, id)).limit(1)
-    if (!existing[0]) throw new AppError('NOT_FOUND', 'User not found')
+    if (!existing[0]) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_USER_NOT_FOUND)
 
     // 不能删系统中最后一个 admin
     if (existing[0].role === 'admin') {
@@ -168,7 +169,7 @@ export const usersRoute = new Hono()
         .from(users)
         .where(and(eq(users.role, 'admin'), eq(users.isActive, true), ne(users.id, id)))
       if (adminCountRows.length === 0) {
-        throw new AppError('VALIDATION_ERROR', 'Cannot delete the last active admin')
+        throw new AppError('VALIDATION_ERROR', '不能删除最后一个启用状态的管理员')
       }
     }
 

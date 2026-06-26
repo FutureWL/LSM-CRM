@@ -42,7 +42,7 @@ export function checkPasswordStrength(
 
   // 长度
   if (plain.length < 8) {
-    errors.push('密码至少 8 个字符（生产建议 12+）')
+    errors.push('至少 8 个字符（生产建议 12+）')
   } else if (plain.length >= 12) {
     score += 2
   } else {
@@ -56,31 +56,31 @@ export function checkPasswordStrength(
   const hasSymbol = /[^A-Za-z0-9]/.test(plain)
   const variety = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length
   if (variety < 2) {
-    errors.push('密码必须包含至少两类字符（大小写字母 / 数字 / 符号）')
+    errors.push('必须包含至少两类字符（大小写字母 / 数字 / 符号）')
   }
   score += variety
 
   // 常见弱密码
   if (COMMON_PASSWORDS.has(plain.toLowerCase())) {
-    errors.push('密码太常见，请换一个')
+    errors.push('太常见，请换一个')
   }
 
   // 不能包含邮箱 / 姓名片段
   if (context?.email) {
     const local = context.email.split('@')[0]?.toLowerCase() ?? ''
     if (local.length >= 3 && plain.toLowerCase().includes(local)) {
-      errors.push('密码不能包含邮箱用户名')
+      errors.push('不能包含邮箱用户名')
     }
   }
   if (context?.name && context.name.length >= 2) {
     if (plain.toLowerCase().includes(context.name.toLowerCase())) {
-      errors.push('密码不能包含姓名')
+      errors.push('不能包含姓名')
     }
   }
 
   // 不能与旧密码相同（由调用方 verifyPassword 后比较）
   if (context?.oldPassword && plain === context.oldPassword) {
-    errors.push('新密码不能与旧密码相同')
+    errors.push('不能与旧密码相同')
   }
 
   const strength: PasswordStrength =

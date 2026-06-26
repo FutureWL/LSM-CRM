@@ -98,13 +98,13 @@ function warnDevInsecure(): void {
   if (IS_PROD) return
   const warnings: string[] = []
   if (_cookieInsecure) {
-    warnings.push('COOKIE_INSECURE=1 — dev 模式允许，**生产必须设 0**')
+    warnings.push('COOKIE_INSECURE=1 — dev 模式允许，**生产必须设为 0**')
   }
   if (_sessionSecret && _sessionSecret.length < 32) {
     warnings.push(`SESSION_SECRET 长度 ${_sessionSecret.length} < 32 — dev 模式允许，**生产必须 >= 32**`)
   }
   if (_databaseUrl?.includes('changeme')) {
-    warnings.push('DATABASE_URL 含 changeme — dev 默认，**生产必须改**')
+    warnings.push('DATABASE_URL 含 changeme — dev 默认，**生产必须修改**')
   }
   for (const w of warnings) {
     console.warn(`[env] ⚠️  ${w}`)

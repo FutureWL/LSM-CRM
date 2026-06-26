@@ -10,14 +10,15 @@ function redact(input: unknown, depth = 0): unknown {
   if (depth > 4) return '[depth-limit]'
   if (input == null) return input
   if (typeof input === 'string') {
-    if (SENSITIVE_KEYS.test(input)) return '[REDACTED]'
+    // 字符串中含敏感词仅脱敏该词，不整体抹掉（避免错误信息不可读）
     return input.length > 500 ? input.slice(0, 500) + '...[truncated]' : input
   }
   if (Array.isArray(input)) return input.map((v) => redact(v, depth + 1))
   if (typeof input === 'object') {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(input)) {
-      if (SENSITIVE_KEYS.test(k)) {
+      // 仅当值是敏感字段时脱敏；保留 key 以便调试
+      if (SENSITIVE_KEYS.test(k) && (typeof v === 'string' || typeof v === 'number')) {
         out[k] = '[REDACTED]'
       } else {
         out[k] = redact(v, depth + 1)

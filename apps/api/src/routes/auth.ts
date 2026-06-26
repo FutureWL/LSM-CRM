@@ -15,6 +15,7 @@ import {
 import { requireAuth } from '../auth/middleware'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
+import { ErrorMessages } from '../lib/error-messages'
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -43,14 +44,14 @@ export const auth = new Hono()
     const body = await c.req.json().catch(() => null)
     const parsed = loginSchema.safeParse(body)
     if (!parsed.success) {
-      throw new AppError('VALIDATION_ERROR', 'Invalid login payload', parsed.error.flatten())
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     }
     const { email, password } = parsed.data
     const rows = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1)
     const user = rows[0]
     if (!user || !user.isActive || !(await verifyPassword(user.passwordHash, password))) {
       // 不区分"用户不存在"和"密码错误"，避免账号枚举
-      throw new AppError('UNAUTHORIZED', 'Invalid email or password')
+      throw new AppError('UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_INVALID_CREDENTIALS)
     }
     const { rawToken } = await createSession(user.id, c.req.header('user-agent') ?? undefined)
     setSessionCookie(c, rawToken)
@@ -78,17 +79,17 @@ export const auth = new Hono()
     const body = await c.req.json().catch(() => null)
     const parsed = changePasswordSchema.safeParse(body)
     if (!parsed.success) {
-      throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     }
     const { currentPassword, newPassword } = parsed.data
 
     // 主动改密：必须验证旧密码；强制改密流程可省略
     if (!u.mustChangePassword) {
       if (!currentPassword) {
-        throw new AppError('VALIDATION_ERROR', 'currentPassword required')
+        throw new AppError('VALIDATION_ERROR', '主动修改密码时必须提供当前密码')
       }
       if (!(await verifyPassword(u.passwordHash, currentPassword))) {
-        throw new AppError('UNAUTHORIZED', 'Current password incorrect')
+        throw new AppError('UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_CURRENT_PASSWORD)
       }
     }
 
@@ -99,7 +100,7 @@ export const auth = new Hono()
       oldPassword: u.mustChangePassword ? undefined : currentPassword,
     })
     if (!check.ok) {
-      throw new AppError('VALIDATION_ERROR', 'Password too weak', { errors: check.errors })
+      throw new AppError('VALIDATION_ERROR', ErrorMessages.PASSWORD_TOO_WEAK(check.errors), { errors: check.errors })
     }
 
     const newHash = await hashPassword(newPassword)

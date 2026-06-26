@@ -6,6 +6,7 @@ import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm'
 import { requireAuthAndPasswordOk } from '../auth/middleware'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
+import { ErrorMessages } from '../lib/error-messages'
 import { CUSTOMER_STAGES, VISIT_TYPES, VISIT_RESULTS } from '../lib/stage'
 
 const listQuery = z.object({
@@ -39,7 +40,7 @@ export const visitsRoute = new Hono()
     const me = c.get('user')
     const raw = Object.fromEntries(new URL(c.req.url).searchParams)
     const parsed = listQuery.safeParse(raw)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid query', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_QUERY, parsed.error.flatten())
     const { customerId, salesmanId, from, to, page, limit } = parsed.data
 
     const where = [isNull(visits.deletedAt)]
@@ -74,14 +75,14 @@ export const visitsRoute = new Hono()
       visitedAt: z.coerce.date().default(() => new Date()),
     })
     const parsed = schema.safeParse(body)
-    if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid payload', parsed.error.flatten())
+    if (!parsed.success) throw new AppError('VALIDATION_ERROR', ErrorMessages.VALIDATION_INVALID_PAYLOAD, parsed.error.flatten())
     const data = parsed.data
 
     return await db.transaction(async (tx) => {
       const custRows = await tx.select().from(customers).where(eq(customers.id, data.customerId)).limit(1)
       const cust = custRows[0]
-      if (!cust) throw new AppError('NOT_FOUND', 'Customer not found')
-      if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', 'Not your customer')
+      if (!cust) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_CUSTOMER_NOT_FOUND)
+      if (me.role === 'sales' && cust.ownerId !== me.id) throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_CUSTOMER)
 
       const inserted = await tx
         .insert(visits)
@@ -117,10 +118,10 @@ export const visitsRoute = new Hono()
     const id = c.req.param('id')
     const existingRows = await db.select().from(visits).where(eq(visits.id, id)).limit(1)
     const existing = existingRows[0]
-    if (!existing) throw new AppError('NOT_FOUND', 'Visit not found')
-    if (existing.deletedAt) throw new AppError('NOT_FOUND', 'Visit already deleted')
+    if (!existing) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_VISIT_NOT_FOUND)
+    if (existing.deletedAt) throw new AppError('NOT_FOUND', ErrorMessages.RESOURCE_VISIT_ALREADY_DELETED)
     if (me.role !== 'admin' && existing.salesmanId !== me.id) {
-      throw new AppError('FORBIDDEN', 'Not your visit')
+      throw new AppError('FORBIDDEN', ErrorMessages.FORBIDDEN_NOT_YOUR_VISIT)
     }
     await db.update(visits).set({ deletedAt: new Date() }).where(eq(visits.id, id))
     return ok(c, { deleted: true, id })
