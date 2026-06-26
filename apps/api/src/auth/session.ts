@@ -1,0 +1,88 @@
+import type { Context } from 'hono'
+import { createHash, randomBytes } from 'node:crypto'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { eq, lt } from 'drizzle-orm'
+import { db } from '../db/client'
+import { sessions } from '../db/schema'
+import { APP_ENV } from '../config/env'
+
+// __Host- prefix requires: Secure flag, Path=/, no Domain attribute.
+// Together this guarantees the cookie is bound to the exact origin (no subdomain leakage).
+// In dev (HTTP localhost) we relax both:
+//   - COOKIE_INSECURE=1 disables Secure flag
+//   - this also requires dropping the __Host- prefix (Hono enforces the pair)
+// Production (HTTPS) MUST keep __Host- prefix for security.
+function cookieSecure(): boolean {
+  if (process.env.COOKIE_INSECURE === '1') return false
+  return true
+}
+
+export const SESSION_COOKIE = cookieSecure() ? '__Host-lsm_session' : 'lsm_session'
+export const SESSION_TTL_SEC = 60 * 60 * 24 * 7 // 7 days
+
+/** Raw bearer token (sent to client as cookie). 32 bytes base64url. */
+function newRawToken(): string {
+  return randomBytes(32).toString('base64url')
+}
+
+/** DB key = SHA-256 hex of raw token. Cookie stores the raw token; DB never sees it. */
+function hashToken(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex')
+}
+
+export async function createSession(userId: string, userAgent?: string) {
+  const raw = newRawToken()
+  const id = hashToken(raw)
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SEC * 1000)
+  await db.insert(sessions).values({ id, userId, expiresAt, userAgent })
+  return { rawToken: raw, expiresAt }
+}
+
+export async function getSession(rawToken: string) {
+  if (!rawToken) return null
+  const id = hashToken(rawToken)
+  const rows = await db
+    .select({ userId: sessions.userId, expiresAt: sessions.expiresAt })
+    .from(sessions)
+    .where(eq(sessions.id, id))
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+  if (row.expiresAt.getTime() < Date.now()) {
+    await deleteSessionById(id)
+    return null
+  }
+  return row
+}
+
+export async function deleteSessionById(id: string) {
+  await db.delete(sessions).where(eq(sessions.id, id))
+}
+
+export async function deleteSessionByRawToken(rawToken: string) {
+  if (!rawToken) return
+  const id = hashToken(rawToken)
+  await db.delete(sessions).where(eq(sessions.id, id))
+}
+
+export async function purgeExpiredSessions() {
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()))
+}
+
+export function setSessionCookie(c: Context, rawToken: string) {
+  setCookie(c, SESSION_COOKIE, rawToken, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: cookieSecure(),
+    path: '/',
+    maxAge: SESSION_TTL_SEC,
+  })
+}
+
+export function clearSessionCookie(c: Context) {
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+}
+
+export function getSessionCookie(c: Context): string | undefined {
+  return getCookie(c, SESSION_COOKIE)
+}

@@ -1,0 +1,88 @@
+# ============ 依赖 ============
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# ============ 构建产物 ============
+dist/
+build/
+out/
+*.local
+
+# ============ 运行时/临时文件 ============
+tmp/
+**/tmp/
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+.nuxt/
+.next/
+
+# ============ 日志 ============
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============ 环境变量与本地配置 ============
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# ============ 编辑器 / IDE ============
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ============ TypeScript ============
+*.tsbuildinfo
+
+# ============ 测试覆盖率 ============
+coverage/
+.nyc_output/
+
+# ============ Bun (apps/api) ============
+# 注意：bun.lock 应当提交，不要忽略
+
+# ============ Drizzle / 数据库本地文件 ============
+*.db
+*.sqlite
+*.sqlite3
+apps/api/drizzle/.snapshots-tmp/
+
+# ============ 系统文件 ============
+*.bak
+*.swp
+*.swo
+*~
+
+# ============ 图片资源 ============
+# 截图集中放在 docs/screenshots/ 下，默认不入库
+# 如需提交个别图片，使用 git add -f
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.ico
+*.icns
+
+# ============ 其他 ============
+.eslintcache
+.stylelintcache
+.history/

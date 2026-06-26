@@ -1,0 +1,91 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:-lsm_crm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # 暴露 5432 给 host (仅 127.0.0.1) 便于本地开发跑 migrate/seed
+    # 生产三容器全栈时移除此段，依赖 internal 网络互通
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-33512}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /run:size=16m
+      - /var/run/postgresql:size=16m
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [internal]
+
+  api:
+    build:
+      context: ../../
+      dockerfile: deploy/prod/api.Dockerfile
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SESSION_SECRET: ${SESSION_SECRET:?required}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      VITE_APP_VERSION: ${VITE_APP_VERSION:-0.0.0}
+      VITE_GIT_SHA: ${VITE_GIT_SHA:-dev}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [internal, external]
+
+  web:
+    build:
+      context: ../../
+      dockerfile: deploy/prod/web.Dockerfile
+      args:
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-0.0.0}
+        VITE_GIT_SHA: ${VITE_GIT_SHA:-dev}
+    depends_on:
+      - api
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${BIND_PORT:-33510}:80"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: 0.3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [external]
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+  external:

@@ -1,0 +1,49 @@
+import { defineConfig, loadEnv } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import path from 'node:path'
+
+const shouldOpen = process.env.VITE_OPEN ? process.env.VITE_OPEN === 'true' : true
+
+export default defineConfig(({ mode }) => {
+  // 加载所有 .env.[mode] 文件到 process.env，然后手动合并到 import.meta.env
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
+    plugins: [vue()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+      },
+    },
+    // 把变量显式声明，Vite 才会注入到 import.meta.env
+    define: {
+      'import.meta.env.VITE_STORAGE_PREFIX': JSON.stringify(env.VITE_STORAGE_PREFIX ?? 'lsm-crm'),
+      'import.meta.env.VITE_SEED_ENABLED': JSON.stringify(env.VITE_SEED_ENABLED ?? 'false'),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL ?? ''),
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(env.VITE_APP_VERSION ?? '0.0.0'),
+      'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
+      'import.meta.env.VITE_GIT_SHA': JSON.stringify(env.VITE_GIT_SHA ?? 'local'),
+    },
+    server: {
+      host: '0.0.0.0',
+      // 端口：dev 用环境变量 VITE_PORT 或 33500；strictPort 让端口冲突立刻失败而不是跳转
+      port: Number(process.env.VITE_PORT ?? 33500),
+      strictPort: true,
+      open: shouldOpen,
+      // dev 模式不要限制域名，方便任何来源访问（含 Docker host）
+      ...(mode === 'development' ? { allowedHosts: true } : {}),
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: Number(process.env.VITE_PORT ?? 33503),
+    },
+    build: {
+      // 生产构建输出更整洁的目录结构
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: mode === 'production' ? false : 'inline',
+      // 把构建信息写一份到 dist/version.json
+      // 注：这里只是占位，version.json 在 build 完成后由脚本生成
+    },
+  }
+})
