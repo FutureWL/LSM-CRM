@@ -146,6 +146,17 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Migrate + seed (full)
+        # webServer 起服务前先把 schema + 种子数据准备好
+        # 不然登录会 401 (用户不存在)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgres://lsm_crm:lsm_crm_ci@localhost:5432/lsm_crm
+          SESSION_SECRET: ci-only-32-bytes-not-for-prod
+        run: |
+          bun run db:migrate
+          bun run db:seed -- --full
+
       - name: Run e2e
         run: pnpm e2e
 
