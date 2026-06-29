@@ -86,4 +86,5 @@ apps/api/drizzle/.snapshots-tmp/
 # ============ 其他 ============
 .eslintcache
 .stylelintcache
-.history/
+.history/test-results/
+playwright-report/
