@@ -189,6 +189,14 @@ jobs:
             sleep 1
           done
 
+          echo '--- 诊断 vite proxy ---'
+          # 直接打 vite 起的 33500, 看是否代理到 api
+          echo 'GET http://127.0.0.1:33500/api/v1/health'
+          curl -sS -m 5 -i http://127.0.0.1:33500/api/v1/health 2>&1 | head -10
+          echo
+          echo 'POST http://127.0.0.1:33500/api/v1/auth/login'
+          curl -sS -m 5 -i -X POST http://127.0.0.1:33500/api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"yulisha@lsm-crm.local","password":"Lsm@2026"}' 2>&1 | head -10
+
           echo '--- 跑 e2e ---'
           pnpm e2e
           e2e_exit=$?
