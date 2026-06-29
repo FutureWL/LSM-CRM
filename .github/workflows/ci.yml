@@ -173,8 +173,10 @@ jobs:
           cd ../..
 
           echo '--- 启动 Vite ---'
+          # pnpm exec vite 直接调 vite (不走 pnpm script, 避免 pnpm 11 在 CI runner 上滤 env)
           nohup env VITE_API_PROXY_TARGET=http://127.0.0.1:33501 \
-            pnpm dev > /tmp/vite-e2e.log 2>&1 &
+            DEBUG=vite:proxy \
+            pnpm exec vite > /tmp/vite-e2e.log 2>&1 &
           echo "vite pid: $!"
 
           echo '--- 等待服务就绪 ---'
