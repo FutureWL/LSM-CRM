@@ -158,7 +158,44 @@ jobs:
           bun run db:seed -- --full
 
       - name: Run e2e
-        run: pnpm e2e
+        # 之前用 webServer 自动起服务在 CI runner 上 vite proxy 没生效 (DEBUG env 传递问题)
+        # 改成: CI step 用 nohup 显式起 vite + api (后置), Playwright 复用现有服务
+        # 显式传 VITE_API_PROXY_TARGET 避免 localhost 解析问题
+        run: |
+          echo '--- 启动 API ---'
+          cd apps/api
+          nohup env DATABASE_URL=postgres://lsm_crm:lsm_crm_ci@localhost:5432/lsm_crm \
+            SESSION_SECRET=ci-only-32-bytes-not-for-prod \
+            COOKIE_INSECURE=1 \
+            NODE_ENV=test \
+            bun run dev > /tmp/api-e2e.log 2>&1 &
+          echo "api pid: $!"
+          cd ../..
+
+          echo '--- 启动 Vite ---'
+          nohup env VITE_API_PROXY_TARGET=http://127.0.0.1:33501 \
+            node node_modules/.bin/vite > /tmp/vite-e2e.log 2>&1 &
+          echo "vite pid: $!"
+
+          echo '--- 等待服务就绪 ---'
+          for i in {1..30}; do
+            if curl -sS -m 1 -o /dev/null -w '%{http_code}' http://127.0.0.1:33500/ 2>/dev/null | grep -q 200 \
+              && curl -sS -m 1 -o /dev/null -w '%{http_code}' http://127.0.0.1:33501/api/v1/health 2>/dev/null | grep -q 200; then
+              echo "services up after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          echo '--- 跑 e2e ---'
+          pnpm e2e
+          e2e_exit=$?
+
+          echo '--- 清理服务 ---'
+          pkill -f 'bun run.*src/main.ts' || true
+          pkill -f 'node.*vite' || true
+
+          exit $e2e_exit
 
       - name: Upload test report on failure
         if: failure()
@@ -168,4 +205,6 @@ jobs:
           path: |
             test-results/
             playwright-report/
+            /tmp/api-e2e.log
+            /tmp/vite-e2e.log
           retention-days: 7

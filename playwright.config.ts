@@ -23,24 +23,25 @@ export default defineConfig({
 
   reporter: process.env.CI ? 'github' : 'list',
 
-  // 自动起 vite + api 服务 (CI 必须, 本地 reuseExistingServer 复用已有服务)
+  // 服务由调用方负责启动 (CI step 用 nohup 起, 本地手动起)
+  // Playwright 不自己起 (避免 webServer 模式在 CI runner 上的 env 传递坑)
   webServer: [
     {
-      command: 'cd apps/api && DATABASE_URL=postgres://lsm_crm:lsm_crm_ci@localhost:5432/lsm_crm SESSION_SECRET=ci-only-32-bytes-not-for-prod COOKIE_INSECURE=1 NODE_ENV=test bun run dev',
-      url: 'http://127.0.0.1:33501/api/v1/health',
-      timeout: 30_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
+      // 健康检查, 等 vite 起好
+      command: 'node -e "require(\'http\').get(\'http://127.0.0.1:33500\', r => process.exit(r.statusCode === 200 ? 0 : 1))"',
+      url: 'http://127.0.0.1:33500',
+      timeout: 60_000,
+      reuseExistingServer: true,
+      stdout: 'ignore',
       stderr: 'pipe',
     },
     {
-      // 显式传 VITE_API_PROXY_TARGET (避免 vite 默认 proxy target 走 'localhost' 在 CI runner 上出问题)
-      // 加 DEBUG=vite:proxy 看 proxy 是否生效
-      command: 'VITE_API_PROXY_TARGET=http://127.0.0.1:33501 DEBUG=vite:proxy pnpm dev',
-      url: 'http://127.0.0.1:33500',
-      timeout: 30_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
+      // 健康检查, 等 api 起好
+      command: 'node -e "require(\'http\').get(\'http://127.0.0.1:33501/api/v1/health\', r => process.exit(r.statusCode === 200 ? 0 : 1))"',
+      url: 'http://127.0.0.1:33501/api/v1/health',
+      timeout: 60_000,
+      reuseExistingServer: true,
+      stdout: 'ignore',
       stderr: 'pipe',
     },
   ],
