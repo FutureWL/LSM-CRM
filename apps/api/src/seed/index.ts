@@ -1,12 +1,12 @@
 import { db } from '../db/client'
-import { seedUsers, SEED_PASSWORD } from './users'
+import { seedUsers } from './users'
 
 const FULL_MODE = process.argv.includes('--full')
 
 const main = async () => {
   console.log('[seed] running users ...')
   const u = await seedUsers()
-  console.log(`[seed] users: created=${u.created} updated=${u.updated}`)
+  console.log(`[seed] users: created=${u.created} updated=${u.updated} memberships=${u.membershipsCreated}`)
 
   if (FULL_MODE) {
     const { seedCustomers } = await import('./customers')
@@ -19,7 +19,7 @@ const main = async () => {
     console.log(`[seed] visits: created=${v}`)
   }
 
-  console.log(`[seed] done. demo password: ${SEED_PASSWORD}`)
+  console.log(`[seed] done.`)
   await db.$client.end()
   process.exit(0)
 }
