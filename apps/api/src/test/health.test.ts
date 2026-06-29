@@ -18,7 +18,7 @@ describe('GET /api/v1/health', () => {
   test('GET /api/v1/version 也通', async () => {
     const res = await app.request('/api/v1/version')
     expect(res.status).toBe(200)
-    const body = await res.json()
+    const body = await res.json() as { ok: boolean }
     expect(body.ok).toBe(true)
   })
 

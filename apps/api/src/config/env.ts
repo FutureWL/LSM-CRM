@@ -64,7 +64,7 @@ function validateProductionSafety(): void {
   }
 
   // 3) CORS_ORIGINS 在生产必须显式指定（不接受空 / 通配）
-  const origins = _corsOriginsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+  const origins = (_corsOriginsRaw ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   if (origins.length === 0) {
     errors.push('CORS_ORIGINS 缺失（生产必需；多个用逗号分隔，如 https://app.example.com,https://admin.example.com）')
   } else if (origins.some((o) => o === '*' || !o.startsWith('http'))) {
@@ -120,7 +120,7 @@ warnDevInsecure()
 // =============================================================================
 
 // CORS 解析
-const corsOrigins = _corsOriginsRaw
+const corsOrigins = (_corsOriginsRaw ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)

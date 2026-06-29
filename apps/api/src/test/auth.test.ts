@@ -148,7 +148,7 @@ describe('POST /api/v1/auth/change-password', () => {
         passwordChangedAt: new Date(),
       })
       .returning({ id: users.id })
-    testUserId = created.id
+    testUserId = created!.id
 
     // 拿默认租户
     const [t] = await db.select().from(tenants).where(eq(tenants.slug, 'default')).limit(1)

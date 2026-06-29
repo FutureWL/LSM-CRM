@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import type { SQL } from 'drizzle-orm'
 import { db } from '../db/client'
 import { customers, customerTransfers, visits, users, type Customer } from '../db/schema'
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
@@ -49,11 +50,11 @@ export const customersRoute = new Hono()
     const { stage, ownerId, q, page, limit } = parsed.data
 
     // 关键：所有 query 都要加 tenant_id 过滤
-    const where = [eq(customers.tenantId, tenantId)]
+    const where: SQL<unknown>[] = [eq(customers.tenantId, tenantId)]
     if (me.role === 'sales') where.push(eq(customers.ownerId, me.id))
-    if (stage) where.push(eq(customers.stage, stage))
-    if (ownerId) where.push(eq(customers.ownerId, ownerId))
-    if (q) where.push(or(ilike(customers.name, `%${q}%`), ilike(customers.company, `%${q}%`)))
+    if (stage) where.push(eq(customers.stage, stage)!)
+    if (ownerId) where.push(eq(customers.ownerId, ownerId)!)
+    if (q) where.push(or(ilike(customers.name, `%${q}%`), ilike(customers.company, `%${q}%`))!)
 
     const offset = (page - 1) * limit
     const rows = await db

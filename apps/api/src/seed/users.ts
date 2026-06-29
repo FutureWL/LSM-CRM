@@ -68,6 +68,7 @@ export async function seedUsers(): Promise<{
   membershipsCreated: number
 }> {
   const tenant = await getOrCreateDefaultTenant()
+  // getOrCreateDefaultTenant 一定返回有效记录, 这里用 ! 消除 noUncheckedIndexedAccess 噪音
 
   let created = 0
   let updated = 0
@@ -113,7 +114,7 @@ export async function seedUsers(): Promise<{
           passwordChangedAt: new Date(),
         })
         .returning({ id: users.id })
-      userId = row.id
+      userId = row!.id
       created++
     }
 
@@ -126,7 +127,7 @@ export async function seedUsers(): Promise<{
     if (!existingMembership[0]) {
       await db.insert(tenantMemberships).values({
         userId,
-        tenantId: tenant.id,
+        tenantId: tenant!.id,
         role: u.tenantRole,
         status: 'active',
       })
