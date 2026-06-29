@@ -173,8 +173,10 @@ jobs:
           cd ../..
 
           echo '--- 启动 Vite ---'
-          # pnpm exec vite 直接调 vite (不走 pnpm script, 避免 pnpm 11 在 CI runner 上滤 env)
-          nohup env VITE_API_PROXY_TARGET=http://127.0.0.1:33501 \
+          # VITE_API_BASE_URL=/api/v1 让前端 fetch 自动加 /api/v1 前缀
+          # 这样 vite proxy '/api' 能匹配上, 否则 SPA fallback 返 404
+          nohup env VITE_API_BASE_URL=/api/v1 \
+            VITE_API_PROXY_TARGET=http://127.0.0.1:33501 \
             DEBUG=vite:proxy \
             pnpm exec vite > /tmp/vite-e2e.log 2>&1 &
           echo "vite pid: $!"
