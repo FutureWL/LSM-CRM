@@ -20,10 +20,11 @@ import type {
   VisitType as TypeDto,
 } from './dto'
 
-// 从姓名生成头像 URL（前端演示版行为：DiceBear）
+// 从姓名生成头像 URL（DiceBear initials 风格）
 function avatarFromName(name: string): string {
   const seed = encodeURIComponent(name || 'user')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+  // 使用 shapes 风格，圆角背景，多种颜色
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${seed}&backgroundColor=0d9488,10b981,14b8a6,06b6d4,3b82f6,8b5cf6,a855f7&backgroundType=gradientLinear&fontSize=40&fontWeight=600`
 }
 
 export function dtoToUser(dto: UserDto): User {
