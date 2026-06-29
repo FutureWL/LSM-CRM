@@ -23,6 +23,26 @@ export default defineConfig({
 
   reporter: process.env.CI ? 'github' : 'list',
 
+  // 自动起 vite + api 服务 (CI 必须, 本地 reuseExistingServer 复用已有服务)
+  webServer: [
+    {
+      command: 'cd apps/api && DATABASE_URL=postgres://lsm_crm:lsm_crm_ci@localhost:5432/lsm_crm SESSION_SECRET=ci-only-32-bytes-not-for-prod COOKIE_INSECURE=1 NODE_ENV=test bun run dev',
+      url: 'http://127.0.0.1:33501/api/v1/health',
+      timeout: 30_000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'pnpm dev',
+      url: 'http://127.0.0.1:33500',
+      timeout: 30_000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
+
   use: {
     baseURL: 'http://127.0.0.1:33500',
     trace: 'retain-on-failure',
