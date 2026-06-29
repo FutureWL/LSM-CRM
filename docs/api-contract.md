@@ -26,7 +26,7 @@
 - Cookie: `__Host-lsm_session` (HttpOnly, SameSite=Lax, Path=/, Secure in prod)
 - 登录后所有需要鉴权的端点自动带 cookie
 - 7 天后过期（DB `expires_at` + cookie `Max-Age`）
-- 演示账号密码：`Password123!`（生产环境必须改）
+- 真实用户密码：余莉莎 `Lsm@2026` / 魏来 `WeiLai@2026`（生产环境必须改）
 
 ---
 
@@ -63,7 +63,7 @@
 
 **请求体：**
 ```json
-{ "email": "admin.zhou@lsm-crm.local", "password": "Password123!" }
+{ "email": "yulisha@lsm-crm.local", "password": "Lsm@2026" }
 ```
 
 **响应 200：** Set-Cookie + 用户对象（不含 passwordHash）
