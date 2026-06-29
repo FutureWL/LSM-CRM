@@ -1,0 +1,2 @@
+ALTER TABLE "sessions" ADD COLUMN "last_active_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "sessions_last_active_at_idx" ON "sessions" USING btree ("last_active_at");

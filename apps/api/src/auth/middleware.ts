@@ -4,7 +4,7 @@ import { users, type User } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { fail } from '../lib/response'
 import { ErrorMessages } from '../lib/error-messages'
-import { getSessionCookie, getSession } from './session'
+import { getSessionCookie, getSession, touchSession } from './session'
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -22,6 +22,8 @@ export function requireAuth(): MiddlewareHandler {
     const user = rows[0]
     if (!user) return fail(c, 'UNAUTHORIZED', ErrorMessages.UNAUTHORIZED_USER_NOT_FOUND, 401)
     c.set('user', user)
+    // 续命 (sliding session). await 后再 next, 不阻塞响应
+    void touchSession(raw)
     await next()
   }
 }
@@ -70,6 +72,8 @@ export function requireAuthAndPasswordOk(): MiddlewareHandler {
         { mustChangePassword: true },
       )
     }
+    // 续命 (sliding session)
+    void touchSession(raw)
     await next()
   }
 }

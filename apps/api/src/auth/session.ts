@@ -11,7 +11,12 @@ import { APP_ENV, IS_PROD_ENV } from '../config/env'
 // - 生产期 (HTTPS)：必须 __Host- 前缀（最高安全）
 // - 开发期 (HTTP localhost)：退化为普通 cookie 名 + 不设 Secure
 export const SESSION_COOKIE = APP_ENV.cookieSecure ? '__Host-lsm_session' : 'lsm_session'
-export const SESSION_TTL_SEC = 60 * 60 * 24 * 7 // 7 days
+export const SESSION_TTL_SEC = 60 * 60 * 24 * 7 // 7 days 硬上限
+/**
+ * 空闲超时 (sliding session). 30 分钟无活动则过期.
+ * 鉴权中间件每次访问会 touch lastActiveAt, 活跃用户自动续命.
+ */
+export const SESSION_IDLE_SEC = 60 * 30
 
 // 生产期一旦发现 dev 模式却启用了 Secure + __Host-，会启动失败；这里仅打印告警
 if (IS_PROD_ENV && !APP_ENV.cookieSecure) {
@@ -31,8 +36,15 @@ function hashToken(raw: string): string {
 export async function createSession(userId: string, userAgent?: string) {
   const raw = newRawToken()
   const id = hashToken(raw)
-  const expiresAt = new Date(Date.now() + SESSION_TTL_SEC * 1000)
-  await db.insert(sessions).values({ id, userId, expiresAt, userAgent })
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_SEC * 1000)
+  await db.insert(sessions).values({
+    id,
+    userId,
+    expiresAt,
+    lastActiveAt: now,
+    userAgent,
+  })
   return { rawToken: raw, expiresAt }
 }
 
@@ -40,17 +52,37 @@ export async function getSession(rawToken: string) {
   if (!rawToken) return null
   const id = hashToken(rawToken)
   const rows = await db
-    .select({ userId: sessions.userId, expiresAt: sessions.expiresAt })
+    .select({
+      userId: sessions.userId,
+      expiresAt: sessions.expiresAt,
+      lastActiveAt: sessions.lastActiveAt,
+    })
     .from(sessions)
     .where(eq(sessions.id, id))
     .limit(1)
   const row = rows[0]
   if (!row) return null
-  if (row.expiresAt.getTime() < Date.now()) {
+  const now = Date.now()
+  if (row.expiresAt.getTime() < now) {
+    await deleteSessionById(id)
+    return null
+  }
+  // idle timeout 检查 (sliding session)
+  if (now - row.lastActiveAt.getTime() > SESSION_IDLE_SEC * 1000) {
     await deleteSessionById(id)
     return null
   }
   return row
+}
+
+/** 每次鉴权成功时调用, 更新 lastActiveAt 续命 */
+export async function touchSession(rawToken: string): Promise<void> {
+  if (!rawToken) return
+  const id = hashToken(rawToken)
+  await db
+    .update(sessions)
+    .set({ lastActiveAt: new Date() })
+    .where(eq(sessions.id, id))
 }
 
 export async function deleteSessionById(id: string) {

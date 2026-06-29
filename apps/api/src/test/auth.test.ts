@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'bun:test'
 import app from '../server'
 import { db } from '../db/client'
-import { users, tenantMemberships, tenants } from '../db/schema'
+import { users, tenantMemberships, tenants, sessions } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashPassword } from '../auth/password'
 
@@ -215,6 +215,117 @@ describe('POST /api/v1/auth/change-password', () => {
     if (testUserId) {
       // 先删 membership (CASCADE 应该自动, 但显式删更稳)
       await db.delete(tenantMemberships).where(eq(tenantMemberships.userId, testUserId))
+      await db.delete(users).where(eq(users.id, testUserId))
+    }
+  })
+})
+
+// =============================================================================
+// session idle timeout (sliding session) 测试
+// =============================================================================
+describe('session idle timeout', () => {
+  const TIMEOUT_MS = 30 * 60 * 1000 // 30 min
+  const TEST_USER = {
+    email: 'test-idle@lsm-crm.local',
+    name: '测试-idle',
+    password: 'TestIdlePw1!',
+  }
+  let testUserId: string
+
+  /** 直接往 sessions 表插一条 lastActiveAt = 31 分钟前的 session */
+  async function insertIdleSession(): Promise<string> {
+    const raw = 'idle-test-raw-token-' + Math.random().toString(36).slice(2)
+    const id = require('node:crypto').createHash('sha256').update(raw).digest('hex')
+    const pastDate = new Date(Date.now() - TIMEOUT_MS - 60_000) // 31 分钟前
+    await db.insert(sessions).values({
+      id,
+      userId: testUserId,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 天后
+      lastActiveAt: pastDate,
+    })
+    return raw
+  }
+
+  /** 插一条 lastActiveAt = 5 分钟前的 session (活跃) */
+  async function insertActiveSession(): Promise<string> {
+    const raw = 'active-test-raw-token-' + Math.random().toString(36).slice(2)
+    const id = require('node:crypto').createHash('sha256').update(raw).digest('hex')
+    await db.insert(sessions).values({
+      id,
+      userId: testUserId,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      lastActiveAt: new Date(Date.now() - 5 * 60 * 1000), // 5 分钟前
+    })
+    return raw
+  }
+
+  test('idle 超时 (31 分钟无活动) 的 session 401', async () => {
+    // 创建测试 user
+    const [created] = await db
+      .insert(users)
+      .values({
+        name: TEST_USER.name,
+        email: TEST_USER.email,
+        passwordHash: await hashPassword(TEST_USER.password),
+        role: 'sales',
+        isActive: true,
+        mustChangePassword: false,
+        passwordChangedAt: new Date(),
+      })
+      .returning({ id: users.id })
+    testUserId = created!.id
+    const [t] = await db.select().from(tenants).where(eq(tenants.slug, 'default')).limit(1)
+    await db.insert(tenantMemberships).values({
+      userId: testUserId,
+      tenantId: t!.id,
+      role: 'sales',
+      status: 'active',
+    })
+
+    const idleRaw = await insertIdleSession()
+    const res = await app.request('/api/v1/auth/me', {
+      headers: { Cookie: `lsm_session=${idleRaw}` },
+    })
+    expect(res.status).toBe(401)
+    // 同时 DB 里这条 session 已被清掉
+    const id = require('node:crypto').createHash('sha256').update(idleRaw).digest('hex')
+    const rows = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1)
+    expect(rows.length).toBe(0)
+  })
+
+  test('活跃 session (< 30 分钟) 正常 200', async () => {
+    const activeRaw = await insertActiveSession()
+    const res = await app.request('/api/v1/auth/me', {
+      headers: { Cookie: `lsm_session=${activeRaw}` },
+    })
+    expect(res.status).toBe(200)
+  })
+
+  test('鉴权成功后 lastActiveAt 被更新 (sliding)', async () => {
+    const raw = await insertActiveSession()
+    const id = require('node:crypto').createHash('sha256').update(raw).digest('hex')
+    // 记下访问前的时间
+    const before = await db.select({ lastActiveAt: sessions.lastActiveAt }).from(sessions).where(eq(sessions.id, id)).limit(1)
+    const beforeTime = before[0]!.lastActiveAt.getTime()
+
+    // 等待 50ms 让时间差可检测
+    await new Promise((r) => setTimeout(r, 50))
+
+    const res = await app.request('/api/v1/auth/me', {
+      headers: { Cookie: `lsm_session=${raw}` },
+    })
+    expect(res.status).toBe(200)
+
+    // 等异步 touch 写库 (touchSession 用 void fire-and-forget, 加点等待)
+    await new Promise((r) => setTimeout(r, 100))
+    const after = await db.select({ lastActiveAt: sessions.lastActiveAt }).from(sessions).where(eq(sessions.id, id)).limit(1)
+    const afterTime = after[0]!.lastActiveAt.getTime()
+    expect(afterTime).toBeGreaterThan(beforeTime)
+  })
+
+  test('cleanup: 删除 idle 测试残留', async () => {
+    if (testUserId) {
+      // sessions CASCADE 自动清
       await db.delete(users).where(eq(users.id, testUserId))
     }
   })
