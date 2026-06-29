@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { APP_ENV } from '@/config/env'
+import { APP_ENV, IS_DEV } from '@/config/env'
 import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
@@ -120,10 +120,10 @@ function quickLogin(userEmail: string, userPassword: string) {
         </button>
       </form>
 
-      <!-- 快捷登录（仅测试用） -->
-      <div class="mt-4">
+      <!-- 快捷登录（仅 dev 环境，避免 prod 泄露真实用户密码） -->
+      <div v-if="IS_DEV" class="mt-4">
         <div class="text-ink-500 text-[10px] uppercase tracking-wider mb-2 px-1 text-center">
-          快捷登录（仅测试用）
+          快捷登录（仅开发环境）
         </div>
         <div class="grid grid-cols-2 gap-2">
           <button

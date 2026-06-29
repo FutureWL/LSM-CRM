@@ -18,26 +18,33 @@ import { hashPassword } from '../auth/password'
 const YULISHA = { email: 'yulisha@lsm-crm.local', password: 'Lsm@2026' }
 const WEILAI = { email: 'weilai@lsm-crm.local', password: 'WeiLai@2026' }
 
+// 每次测试用 unique X-Forwarded-For 隔离, 避免 login rate limit 跨测试污染
+// (rate limit 只在生产环境生效, 这里加 XFF 是双保险)
+let ipCounter = 1
+function freshIp(): string {
+  ipCounter++
+  return `203.0.113.${ipCounter}` // TEST-NET-3 文档保留段
+}
+
 async function loginAndGetCookie(email: string, password: string): Promise<string> {
-  const res = await app.request('/api/v1/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
+  const res = await postLogin({ email, password })
   expect(res.status).toBe(200)
   const setCookie = res.headers.get('set-cookie')
   expect(setCookie).toBeTruthy()
-  // 取 cookie 名=值 部分
   return setCookie!.split(';')[0]!
+}
+
+/** POST /auth/login 包装, 默认带 unique X-Forwarded-For 避免限流跨测试污染 */
+async function postLogin(body: unknown, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (!headers.has('X-Forwarded-For')) headers.set('X-Forwarded-For', freshIp())
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  return app.request('/api/v1/auth/login', { ...init, method: 'POST', headers, body: JSON.stringify(body) })
 }
 
 describe('POST /api/v1/auth/login', () => {
   test('余莉莎 (admin) 登录成功, 返回 users + tenants', async () => {
-    const res = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(YULISHA),
-    })
+    const res = await postLogin(YULISHA)
     expect(res.status).toBe(200)
     const body = await res.json() as {
       ok: boolean
@@ -51,11 +58,7 @@ describe('POST /api/v1/auth/login', () => {
   })
 
   test('魏来 (sales) 登录成功', async () => {
-    const res = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(WEILAI),
-    })
+    const res = await postLogin(WEILAI)
     expect(res.status).toBe(200)
     const body = await res.json() as { data: { name: string; role: string } }
     expect(body.data.name).toBe('魏来')
@@ -63,11 +66,7 @@ describe('POST /api/v1/auth/login', () => {
   })
 
   test('错误密码返回 401 UNAUTHORIZED (不区分用户存在 vs 密码错)', async () => {
-    const res = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: YULISHA.email, password: 'wrong-password-xxx' }),
-    })
+    const res = await postLogin({ email: YULISHA.email, password: 'wrong-password-xxx' })
     expect(res.status).toBe(401)
     const body = await res.json() as { ok: boolean; error: { code: string } }
     expect(body.ok).toBe(false)
@@ -75,23 +74,46 @@ describe('POST /api/v1/auth/login', () => {
   })
 
   test('不存在的 email 也返回 401 (不暴露账号枚举)', async () => {
-    const res = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'nobody-xxx@lsm-crm.local', password: 'whatever' }),
-    })
+    const res = await postLogin({ email: 'nobody-xxx@lsm-crm.local', password: 'whatever' })
     expect(res.status).toBe(401)
   })
 
   test('email 格式非法返回 400 VALIDATION_ERROR', async () => {
-    const res = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'not-an-email', password: 'xxx' }),
-    })
+    const res = await postLogin({ email: 'not-an-email', password: 'xxx' })
     expect(res.status).toBe(400)
     const body = await res.json() as { error: { code: string } }
     expect(body.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  test('5 次错误后第 6 次返回 429 RATE_LIMITED (5/min/IP)', async () => {
+    // 用 unique X-Forwarded-For 隔离, 不影响其它测试
+    const ip = '203.0.113.99'
+    for (let i = 0; i < 5; i++) {
+      const r = await app.request('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ email: 'nobody-xxx@lsm-crm.local', password: 'wrong' }),
+      })
+      expect(r.status).toBe(401) // 前 5 次都返回 401
+    }
+    // 第 6 次应被限流
+    const r6 = await app.request('/api/v1/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': ip,
+      },
+      body: JSON.stringify({ email: 'nobody-xxx@lsm-crm.local', password: 'wrong' }),
+    })
+    expect(r6.status).toBe(429)
+    const body = await r6.json() as { error: { code: string } }
+    expect(body.error.code).toBe('RATE_LIMITED')
+    // 标准响应头
+    expect(r6.headers.get('retry-after')).toBeTruthy()
+    expect(r6.headers.get('ratelimit-limit')).toBe('5')
   })
 })
 
@@ -177,19 +199,11 @@ describe('POST /api/v1/auth/change-password', () => {
     expect(changeBody.data.changed).toBe(true)
 
     // 4) 旧密码登不上
-    const oldRes = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: TEST_USER.email, password: TEST_USER.password }),
-    })
+    const oldRes = await postLogin({ email: TEST_USER.email, password: TEST_USER.password })
     expect(oldRes.status).toBe(401)
 
     // 5) 新密码能登
-    const newRes = await app.request('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: TEST_USER.email, password: TEST_USER.newPassword }),
-    })
+    const newRes = await postLogin({ email: TEST_USER.email, password: TEST_USER.newPassword })
     expect(newRes.status).toBe(200)
   })
 

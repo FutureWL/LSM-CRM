@@ -13,9 +13,13 @@ import {
   clearSessionCookie,
 } from '../auth/session'
 import { requireAuth } from '../auth/middleware'
+import { rateLimit } from '../middleware/rate-limit'
 import { ok } from '../lib/response'
 import { AppError } from '../lib/errors'
 import { ErrorMessages } from '../lib/error-messages'
+
+/** login 限流: 5 次 / 分钟 / IP (防暴力破解) */
+const loginRateLimit = rateLimit({ max: 5, windowMs: 60_000 })
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -58,7 +62,7 @@ async function listUserTenants(userId: string) {
 }
 
 export const auth = new Hono()
-  .post('/auth/login', async (c) => {
+  .post('/auth/login', loginRateLimit, async (c) => {
     const body = await c.req.json().catch(() => null)
     const parsed = loginSchema.safeParse(body)
     if (!parsed.success) {
