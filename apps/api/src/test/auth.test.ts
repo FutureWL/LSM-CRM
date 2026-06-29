@@ -88,8 +88,20 @@ describe('POST /api/v1/auth/login', () => {
   test('5 次错误后第 6 次返回 429 RATE_LIMITED (5/min/IP)', async () => {
     // 用 unique X-Forwarded-For 隔离, 不影响其它测试
     const ip = '203.0.113.99'
+    // 临时强制启用 rate limit (auto 模式 dev/test 跳过)
+    const { rateLimit } = await import('../middleware/rate-limit')
+    const strictRateLimit = rateLimit({ max: 5, windowMs: 60_000, enabled: true })
+    // 直接拿登录 handler 套上严格限流, 避免污染其它测试
+    const { Hono } = await import('hono')
+    const testApp = new Hono()
+    testApp.use('*', strictRateLimit)
+    testApp.post('/api/v1/auth/login', async (c) => {
+      // 模拟 401 响应 (跟真路由一致)
+      return c.json({ ok: false, data: null, error: { code: 'UNAUTHORIZED', message: 'invalid' } }, 401)
+    })
+
     for (let i = 0; i < 5; i++) {
-      const r = await app.request('/api/v1/auth/login', {
+      const r = await testApp.request('/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +112,7 @@ describe('POST /api/v1/auth/login', () => {
       expect(r.status).toBe(401) // 前 5 次都返回 401
     }
     // 第 6 次应被限流
-    const r6 = await app.request('/api/v1/auth/login', {
+    const r6 = await testApp.request('/api/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

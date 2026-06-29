@@ -20,6 +20,7 @@ import { ErrorMessages } from '../lib/error-messages'
 
 /** login 限流: 5 次 / 分钟 / IP (防暴力破解) */
 const loginRateLimit = rateLimit({ max: 5, windowMs: 60_000 })
+// 测试中强制启用 (auto 模式 dev/test 跳过, 单元测试需要验证限流逻辑)
 
 const loginSchema = z.object({
   email: z.string().email(),

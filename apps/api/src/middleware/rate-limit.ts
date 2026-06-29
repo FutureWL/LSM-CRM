@@ -15,6 +15,7 @@
 // =============================================================================
 
 import type { MiddlewareHandler } from 'hono'
+import { IS_DEV } from '../config/env'
 
 interface Bucket {
   count: number
@@ -30,6 +31,8 @@ interface RateLimitOptions {
   keyFn?: (c: Parameters<MiddlewareHandler>[0]) => string
   /** 超限时的错误码 (默认 RATE_LIMITED) */
   errorCode?: string
+  /** 强制启用/禁用限流, 默认 'auto' (dev 跳过, prod 启用) */
+  enabled?: boolean | 'auto'
 }
 
 const buckets = new Map<string, Bucket>()
@@ -53,7 +56,15 @@ function defaultKey(c: Parameters<MiddlewareHandler>[0]): string {
 }
 
 export function rateLimit(opts: RateLimitOptions): MiddlewareHandler {
-  const { max, windowMs, keyFn = defaultKey, errorCode = 'RATE_LIMITED' } = opts
+  const { max, windowMs, keyFn = defaultKey, errorCode = 'RATE_LIMITED', enabled = 'auto' } = opts
+  // 决定是否启用限流: enabled=true 强制启用, false 强制禁用, 'auto' 看 IS_DEV
+  const shouldLimit = enabled === true ? true : enabled === false ? false : !IS_DEV
+
+  if (!shouldLimit) {
+    return async (_c, next) => {
+      await next()
+    }
+  }
   return async (c, next) => {
     const key = keyFn(c)
     const now = Date.now()
