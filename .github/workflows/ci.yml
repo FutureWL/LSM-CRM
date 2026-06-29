@@ -174,7 +174,7 @@ jobs:
 
           echo '--- 启动 Vite ---'
           nohup env VITE_API_PROXY_TARGET=http://127.0.0.1:33501 \
-            node node_modules/.bin/vite > /tmp/vite-e2e.log 2>&1 &
+            pnpm dev > /tmp/vite-e2e.log 2>&1 &
           echo "vite pid: $!"
 
           echo '--- 等待服务就绪 ---'
