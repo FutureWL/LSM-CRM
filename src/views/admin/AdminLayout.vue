@@ -2,17 +2,28 @@
 import { computed } from 'vue'
 import { useRoute, useRouter, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AppIcon from '@/components/AppIcon.vue'
+import {
+  ChartBarIcon,
+  UsersIcon,
+  ClipboardDocumentListIcon,
+  TrophyIcon,
+  ShieldCheckIcon,
+  KeyIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronRightIcon,
+} from '@heroicons/vue/24/outline'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
 const menus = [
-  { name: 'admin-dashboard', label: '仪表盘', icon: '📊' },
-  { name: 'admin-customers', label: '客户', icon: '👥' },
-  { name: 'admin-visits', label: '拜访记录', icon: '📋' },
-  { name: 'admin-sales', label: '销售团队', icon: '🏆' },
-  { name: 'admin-users', label: '账号管理', icon: '🛡️' },
+  { name: 'admin-dashboard', label: '仪表盘', icon: ChartBarIcon },
+  { name: 'admin-customers', label: '客户', icon: UsersIcon },
+  { name: 'admin-visits', label: '拜访记录', icon: ClipboardDocumentListIcon },
+  { name: 'admin-sales', label: '销售团队', icon: TrophyIcon },
+  { name: 'admin-users', label: '账号管理', icon: ShieldCheckIcon },
 ]
 
 const currentTitle = computed(() => {
@@ -58,7 +69,7 @@ function onChangePassword() {
               : 'text-ink-300 hover:bg-ink-800 hover:text-white'
           "
         >
-          <span class="text-base">{{ m.icon }}</span>
+          <component :is="m.icon" class="w-5 h-5" />
           <span>{{ m.label }}</span>
         </RouterLink>
       </nav>
@@ -79,14 +90,14 @@ function onChangePassword() {
             class="text-ink-400 hover:text-white p-1"
             title="修改密码"
           >
-            🔑
+            <KeyIcon class="w-4 h-4" />
           </button>
           <button
             @click="onLogout"
             class="text-ink-400 hover:text-white p-1"
             title="退出"
           >
-            ⏻
+            <ArrowRightOnRectangleIcon class="w-4 h-4" />
           </button>
         </div>
       </div>

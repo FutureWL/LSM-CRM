@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useCustomersStore } from '@/stores/customers'
 import { useVisitsStore } from '@/stores/visits'
 import { isThisMonth, formatMoney } from '@/lib/format'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -91,13 +92,13 @@ const stats = computed(() => {
         class="w-full bg-white rounded-xl p-4 border border-ink-100 text-left active:scale-[0.99] transition-transform flex items-center gap-3"
       >
         <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-          🔑
+          <AppIcon name="KeyIcon" class="w-5 h-5" />
         </div>
         <div class="flex-1">
           <div class="text-sm font-medium text-ink-800">修改密码</div>
           <div class="text-xs text-ink-400 mt-0.5">定期更换密码更安全</div>
         </div>
-        <div class="text-ink-300">›</div>
+        <AppIcon name="ChevronRightIcon" class="w-4 h-4 text-ink-300" />
       </button>
 
       <button
@@ -105,37 +106,16 @@ const stats = computed(() => {
         class="w-full bg-white rounded-xl p-4 border border-ink-100 text-left active:scale-[0.99] transition-transform flex items-center gap-3"
       >
         <div class="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center">
-          ⏻
+          <AppIcon name="PowerIcon" class="w-5 h-5" />
         </div>
         <div class="flex-1">
           <div class="text-sm font-medium text-ink-800">切换账号</div>
           <div class="text-xs text-ink-400 mt-0.5">返回登录页</div>
         </div>
-        <div class="text-ink-300">›</div>
+        <AppIcon name="ChevronRightIcon" class="w-4 h-4 text-ink-300" />
       </button>
 
-      <div class="bg-white rounded-xl border border-ink-100 divide-y divide-ink-100">
-        <div class="p-4 flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-sm">
-            🏢
-          </div>
-          <div class="flex-1">
-            <div class="text-sm text-ink-800">关于 LSM-CRM</div>
-            <div class="text-xs text-ink-400 mt-0.5">v0.1.0 演示版</div>
-          </div>
-        </div>
-        <div class="p-4 flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
-            📊
-          </div>
-          <div class="flex-1">
-            <div class="text-sm text-ink-800">演示数据</div>
-            <div class="text-xs text-ink-400 mt-0.5">
-              存于浏览器本地,刷新不丢失
-            </div>
-          </div>
-        </div>
-      </div>
+
     </div>
   </div>
 </template>

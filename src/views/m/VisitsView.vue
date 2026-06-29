@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useVisitsStore } from '@/stores/visits'
 import { useCustomersStore } from '@/stores/customers'
 import { formatDate, fromNow } from '@/lib/format'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -58,7 +59,9 @@ const myVisits = computed(() => {
     </div>
 
     <div v-if="myVisits.length === 0" class="bg-white rounded-2xl p-12 text-center border border-ink-100">
-      <div class="text-4xl mb-2">📋</div>
+      <div class="text-4xl mb-2 text-brand-500">
+        <AppIcon name="ClipboardDocumentListIcon" class="w-10 h-10" />
+      </div>
       <div class="text-ink-500 text-sm">暂无拜访记录</div>
     </div>
     <div v-else class="space-y-2">
@@ -76,7 +79,10 @@ const myVisits = computed(() => {
         </div>
         <div class="text-sm text-ink-600 line-clamp-2 leading-relaxed">{{ v.content }}</div>
         <div class="flex items-center gap-3 mt-3 text-xs text-ink-400">
-          <span>📅 {{ formatDate(v.visitedAt, 'MM-DD HH:mm') }}</span>
+          <span class="inline-flex items-center gap-1">
+            <AppIcon name="CalendarDaysIcon" class="w-3 h-3" />
+            {{ formatDate(v.visitedAt, 'MM-DD HH:mm') }}
+          </span>
           <span>⏱ {{ v.duration }} 分钟</span>
         </div>
       </div>

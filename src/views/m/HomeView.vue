@@ -6,6 +6,7 @@ import { useCustomersStore } from '@/stores/customers'
 import { useVisitsStore } from '@/stores/visits'
 import { isToday, formatMoney, fromNow } from '@/lib/format'
 import StageTag from '@/components/StageTag.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import dayjs from 'dayjs'
 
 const router = useRouter()
@@ -135,7 +136,9 @@ function daysToDue(dueDate?: string): number {
       <div class="bg-white rounded-2xl p-4 border border-ink-100 shadow-card">
         <div class="flex items-center justify-between">
           <div class="text-xs text-ink-400">待回款</div>
-          <div class="text-amber-500 text-sm">💵</div>
+          <div class="text-amber-500">
+            <AppIcon name="CurrencyDollarIcon" class="w-4 h-4" />
+          </div>
         </div>
         <div class="text-xl font-bold text-ink-900 mt-1.5">
           {{ formatMoney(stats.dueAmount) }}
@@ -147,7 +150,9 @@ function daysToDue(dueDate?: string): number {
       <div class="bg-white rounded-2xl p-4 border border-ink-100 shadow-card">
         <div class="flex items-center justify-between">
           <div class="text-xs text-ink-400">预测商机</div>
-          <div class="text-brand-500 text-sm">📈</div>
+          <div class="text-brand-500">
+            <AppIcon name="ArrowTrendingUpIcon" class="w-4 h-4" />
+          </div>
         </div>
         <div class="text-xl font-bold text-ink-900 mt-1.5">
           {{ formatMoney(stats.forecast) }}
@@ -161,7 +166,9 @@ function daysToDue(dueDate?: string): number {
     <section v-if="collectionTodo.length > 0">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-ink-800 font-semibold flex items-center gap-1.5">
-          <span class="text-amber-500">💵</span>
+          <span class="text-amber-500">
+            <AppIcon name="CurrencyDollarIcon" class="w-4 h-4" />
+          </span>
           <span>今日待催款</span>
         </h2>
         <span class="text-xs text-ink-400">{{ collectionTodo.length }} 笔</span>
@@ -197,7 +204,9 @@ function daysToDue(dueDate?: string): number {
     <section v-if="warrantyTodo.length > 0">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-ink-800 font-semibold flex items-center gap-1.5">
-          <span class="text-sky-500">🛡️</span>
+          <span class="text-sky-500">
+            <AppIcon name="ShieldCheckIcon" class="w-4 h-4" />
+          </span>
           <span>质保回访</span>
         </h2>
         <span class="text-xs text-ink-400">{{ warrantyTodo.length }} 个</span>
@@ -237,7 +246,9 @@ function daysToDue(dueDate?: string): number {
         v-if="todayVisits.length === 0"
         class="bg-white rounded-2xl p-8 text-center border border-ink-100"
       >
-        <div class="text-3xl mb-2">☕</div>
+        <div class="text-3xl mb-2 text-amber-500">
+          <AppIcon name="ClockIcon" class="w-8 h-8" />
+        </div>
         <div class="text-ink-500 text-sm">今天还没有拜访记录</div>
         <button
           @click="router.push('/m/visit/new')"

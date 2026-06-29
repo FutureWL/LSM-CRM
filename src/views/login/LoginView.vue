@@ -2,7 +2,8 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { APP_ENV, IS_DEV } from '@/config/env'
+import { APP_ENV } from '@/config/env'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -42,9 +43,9 @@ async function submit() {
   }
 }
 
-function fillDevAccount(email_: string) {
-  email.value = email_
-  password.value = 'Password123!'
+function quickLogin(userEmail: string, userPassword: string) {
+  email.value = userEmail
+  password.value = userPassword
 }
 </script>
 
@@ -119,46 +120,35 @@ function fillDevAccount(email_: string) {
         </button>
       </form>
 
-      <div v-if="IS_DEV" class="mt-6">
+      <!-- 快捷登录（仅测试用） -->
+      <div class="mt-4">
         <div class="text-ink-500 text-[10px] uppercase tracking-wider mb-2 px-1 text-center">
-          开发环境快捷登录（仅 dev）
+          快捷登录（仅测试用）
         </div>
         <div class="grid grid-cols-2 gap-2">
           <button
             type="button"
-            @click="fillDevAccount('admin.zhou@lsm-crm.local')"
-            class="px-2 py-1.5 text-[11px] rounded-md bg-ink-800/40 hover:bg-ink-800 text-ink-300 border border-ink-700/40"
+            @click="quickLogin('yulisha@lsm-crm.local', 'Lsm@2026')"
+            class="px-3 py-2.5 text-[12px] rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-colors flex items-center justify-center gap-1.5"
           >
-            🔴 周总（admin）
+            <AppIcon name="UserCircleIcon" class="w-4 h-4" />
+            余莉莎（管理员）
           </button>
           <button
             type="button"
-            @click="fillDevAccount('admin.lin@lsm-crm.local')"
-            class="px-2 py-1.5 text-[11px] rounded-md bg-ink-800/40 hover:bg-ink-800 text-ink-300 border border-ink-700/40"
+            @click="quickLogin('weilai@lsm-crm.local', 'WeiLai@2026')"
+            class="px-3 py-2.5 text-[12px] rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1.5"
           >
-            🔴 林总监（admin）
-          </button>
-          <button
-            type="button"
-            @click="fillDevAccount('sales.zhang@lsm-crm.local')"
-            class="px-2 py-1.5 text-[11px] rounded-md bg-ink-800/40 hover:bg-ink-800 text-ink-300 border border-ink-700/40"
-          >
-            🟢 张伟（sales）
-          </button>
-          <button
-            type="button"
-            @click="fillDevAccount('sales.li@lsm-crm.local')"
-            class="px-2 py-1.5 text-[11px] rounded-md bg-ink-800/40 hover:bg-ink-800 text-ink-300 border border-ink-700/40"
-          >
-            🟢 李娜（sales）
+            <AppIcon name="UserIcon" class="w-4 h-4" />
+            魏来（销售）
           </button>
         </div>
       </div>
 
-      <div class="text-center text-ink-500 text-xs mt-8 space-y-1">
+      <div class="text-center text-ink-500 text-xs mt-6 space-y-1">
         <div>忘记密码？请联系系统管理员</div>
         <div class="text-ink-600">
-          v{{ APP_ENV.appVersion }} · {{ IS_DEV ? '开发环境' : '生产环境' }} · build {{ APP_ENV.buildTime.slice(0, 19).replace('T', ' ') }}
+          v{{ APP_ENV.appVersion }}
         </div>
       </div>
     </div>

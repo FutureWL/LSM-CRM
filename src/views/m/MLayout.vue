@@ -2,16 +2,18 @@
 import { useRouter, useRoute, RouterView } from 'vue-router'
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { HomeIcon, UsersIcon, ClipboardDocumentListIcon, UserIcon } from '@heroicons/vue/24/outline'
+import { HomeIcon as HomeIconSolid, UsersIcon as UsersIconSolid, ClipboardDocumentListIcon as ClipboardIconSolid, UserIcon as UserIconSolid } from '@heroicons/vue/24/solid'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
 const tabs = [
-  { name: 'm-home', label: '首页', icon: '🏠' },
-  { name: 'm-customers', label: '客户', icon: '👥' },
-  { name: 'm-visits', label: '拜访', icon: '📋' },
-  { name: 'm-profile', label: '我的', icon: '👤' },
+  { name: 'm-home', label: '首页', icon: HomeIcon, iconActive: HomeIconSolid },
+  { name: 'm-customers', label: '客户', icon: UsersIcon, iconActive: UsersIconSolid },
+  { name: 'm-visits', label: '拜访', icon: ClipboardDocumentListIcon, iconActive: ClipboardIconSolid },
+  { name: 'm-profile', label: '我的', icon: UserIcon, iconActive: UserIconSolid },
 ]
 
 const active = computed(() => String(route.name ?? ''))
@@ -52,7 +54,10 @@ function onTab(name: string) {
           class="flex flex-col items-center gap-0.5 py-2.5 transition-colors"
           :class="active === t.name ? 'text-brand-600' : 'text-ink-400'"
         >
-          <span class="text-lg">{{ t.icon }}</span>
+          <component
+            :is="active === t.name ? t.iconActive : t.icon"
+            class="w-6 h-6"
+          />
           <span class="text-[10px] font-medium">{{ t.label }}</span>
         </button>
       </div>

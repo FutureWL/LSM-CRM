@@ -7,6 +7,7 @@ import { useUsersStore } from '@/stores/users'
 import { formatDate, formatMoney } from '@/lib/format'
 import StageTag from '@/components/StageTag.vue'
 import VisitTimeline from '@/components/VisitTimeline.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import dayjs from 'dayjs'
 
 const route = useRoute()
@@ -102,8 +103,9 @@ const warrantyDaysLeft = computed(() =>
           </div>
         </div>
 
-        <div v-if="customer.address" class="mt-3 text-xs text-ink-500">
-          📍 {{ customer.address }}
+        <div v-if="customer.address" class="mt-3 text-xs text-ink-500 flex items-start gap-1">
+          <AppIcon name="MapPinIcon" class="w-3 h-3 mt-0.5 flex-shrink-0" />
+          <span>{{ customer.address }}</span>
         </div>
         <div v-if="customer.remark" class="mt-3 p-3 bg-ink-50 rounded-lg text-xs text-ink-600 leading-relaxed">
           {{ customer.remark }}
@@ -117,7 +119,9 @@ const warrantyDaysLeft = computed(() =>
         <div class="bg-white rounded-2xl p-4 border border-ink-100 shadow-card">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
-              <div class="text-base">💵</div>
+              <div class="text-base text-amber-500">
+              <AppIcon name="CurrencyDollarIcon" class="w-5 h-5" />
+            </div>
               <div class="text-sm font-semibold text-ink-800">账款</div>
               <span
                 v-if="paymentState === 'overdue'"
@@ -163,7 +167,9 @@ const warrantyDaysLeft = computed(() =>
         <div class="bg-white rounded-2xl p-4 border border-ink-100 shadow-card">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
-              <div class="text-base">🛡️</div>
+              <div class="text-base text-sky-500">
+              <AppIcon name="ShieldCheckIcon" class="w-5 h-5" />
+            </div>
               <div class="text-sm font-semibold text-ink-800">质保期</div>
               <span
                 v-if="warrantyState === 'active'"
@@ -213,7 +219,10 @@ const warrantyDaysLeft = computed(() =>
           <div class="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
           <div class="relative">
             <div class="flex items-center justify-between">
-              <div class="text-xs text-brand-100">📈 商机预测 · 下一单</div>
+              <div class="text-xs text-brand-100 inline-flex items-center gap-1">
+              <AppIcon name="ArrowTrendingUpIcon" class="w-3 h-3" />
+              商机预测 · 下一单
+            </div>
               <div class="text-[10px] px-2 py-0.5 rounded-full bg-white/20">
                 {{ customer.predictedProduct }}
               </div>
@@ -235,19 +244,19 @@ const warrantyDaysLeft = computed(() =>
         @click="router.push(`/m/visit/new?customerId=${customer.id}&type=collection`)"
         class="py-3 rounded-2xl bg-amber-50 text-amber-700 text-sm font-medium active:scale-[0.99] transition-transform border border-amber-100"
       >
-        💵 催款跟进
+        催款跟进
       </button>
       <button
         @click="router.push(`/m/visit/new?customerId=${customer.id}&type=warranty`)"
         class="py-3 rounded-2xl bg-sky-50 text-sky-700 text-sm font-medium active:scale-[0.99] transition-transform border border-sky-100"
       >
-        🛡️ 质保回访
+        质保回访
       </button>
       <button
         @click="router.push(`/m/visit/new?customerId=${customer.id}&type=introduction`)"
         class="py-3 rounded-2xl bg-emerald-50 text-emerald-700 text-sm font-medium active:scale-[0.99] transition-transform border border-emerald-100"
       >
-        📈 商机介绍
+        商机介绍
       </button>
       <button
         @click="router.push(`/m/visit/new?customerId=${customer.id}`)"
