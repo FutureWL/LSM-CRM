@@ -127,7 +127,7 @@ const icons = {
   ShieldCheckIcon,
 }
 
-type IconName = keyof typeof icons
+export type IconName = keyof typeof icons
 
 const props = defineProps<{
   name: IconName

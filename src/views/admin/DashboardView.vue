@@ -7,32 +7,35 @@ import { FUNNEL_STAGES, STAGE_MAP } from '@/lib/stage'
 import { formatMoney, isThisMonth } from '@/lib/format'
 import dayjs from 'dayjs'
 import Chart from '@/components/Chart.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 
 const customers = useCustomersStore()
 const visits = useVisitsStore()
 const users = useUsersStore()
 
-const kpis = computed(() => [
+// ---- 主 KPI（4 个） ----
+type Kpi = { label: string; value: string | number; sub: string; color: string; icon: IconName }
+const kpis = computed<Kpi[]>(() => [
   {
     label: '客户总数',
     value: customers.total,
     sub: `本月新增 ${customers.newThisMonth}`,
     color: '#0ea5e9',
-    icon: '👥',
+    icon: 'UsersIcon',
   },
   {
     label: '本月拜访',
     value: visits.thisMonth,
     sub: `今日 ${visits.today} 次`,
     color: '#10b981',
-    icon: '📞',
+    icon: 'PhoneIcon',
   },
   {
     label: '已成交',
     value: customers.wonCount,
     sub: `占比 ${customers.wonRate}%`,
     color: '#f59e0b',
-    icon: '🏆',
+    icon: 'TrophyIcon',
   },
   {
     label: '累计成交金额',
@@ -43,41 +46,43 @@ const kpis = computed(() => [
     ),
     sub: '已签约合同估算',
     color: '#8b5cf6',
-    icon: '💰',
+    icon: 'CurrencyDollarIcon',
   },
 ])
 
-const bizKpis = computed(() => [
+// ---- 业务 KPI（4 个） ----
+const bizKpis = computed<Kpi[]>(() => [
   {
     label: '待回款',
     value: formatMoney(customers.totalAmountDue),
     sub: `${customers.dueSoonList.length} 笔 7 天内到期`,
     color: '#f59e0b',
-    icon: '💵',
+    icon: 'ClockIcon',
   },
   {
     label: '逾期金额',
     value: formatMoney(customers.overdueAmount),
     sub: `${customers.overdueList.length} 笔逾期`,
     color: '#ef4444',
-    icon: '⚠️',
+    icon: 'ExclamationTriangleIcon',
   },
   {
     label: '质保中客户',
     value: customers.inWarrantyList.length,
     sub: `${customers.expiringWarrantyList.length} 笔 30 天内到期`,
     color: '#0ea5e9',
-    icon: '🛡️',
+    icon: 'ShieldCheckIcon',
   },
   {
     label: '预测商机',
     value: formatMoney(customers.forecastValue),
     sub: `${customers.forecastList.length} 个客户有续单意向`,
     color: '#10b981',
-    icon: '📈',
+    icon: 'ArrowTrendingUpIcon',
   },
 ])
 
+// ---- 销售业绩排行（柱状图） ----
 const rankOption = computed(() => {
   const sales = users.sales()
   const data = sales
@@ -136,6 +141,7 @@ const rankOption = computed(() => {
   }
 })
 
+// ---- 客户阶段漏斗 ----
 const funnelOption = computed(() => {
   const data = FUNNEL_STAGES.map((s) => ({
     name: STAGE_MAP[s].label,
@@ -176,6 +182,7 @@ const funnelOption = computed(() => {
   }
 })
 
+// ---- 30 天拜访趋势 ----
 const trendOption = computed(() => {
   const days: { date: string; count: number }[] = []
   for (let i = 29; i >= 0; i--) {
@@ -230,6 +237,15 @@ const trendOption = computed(() => {
 
 <template>
   <div class="space-y-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-semibold text-ink-900">仪表盘</h2>
+        <p class="text-xs text-ink-400 mt-1">全公司销售全景</p>
+      </div>
+    </div>
+
+    <!-- 8 个 KPI 卡片 -->
     <div class="grid grid-cols-4 gap-4">
       <div
         v-for="k in kpis"
@@ -238,10 +254,10 @@ const trendOption = computed(() => {
       >
         <div class="flex items-center justify-between mb-3">
           <div
-            class="w-9 h-9 rounded-lg flex items-center justify-center text-base"
+            class="w-9 h-9 rounded-lg flex items-center justify-center"
             :style="{ backgroundColor: k.color + '15', color: k.color }"
           >
-            {{ k.icon }}
+            <AppIcon :name="k.icon" class="w-5 h-5" />
           </div>
           <div class="text-xs text-ink-400">{{ k.sub }}</div>
         </div>
@@ -258,10 +274,10 @@ const trendOption = computed(() => {
       >
         <div class="flex items-center justify-between mb-3">
           <div
-            class="w-9 h-9 rounded-lg flex items-center justify-center text-base"
+            class="w-9 h-9 rounded-lg flex items-center justify-center"
             :style="{ backgroundColor: k.color + '15', color: k.color }"
           >
-            {{ k.icon }}
+            <AppIcon :name="k.icon" class="w-5 h-5" />
           </div>
           <div class="text-xs text-ink-400">{{ k.sub }}</div>
         </div>
@@ -270,6 +286,7 @@ const trendOption = computed(() => {
       </div>
     </div>
 
+    <!-- 销售排行 + 客户漏斗 -->
     <div class="grid grid-cols-3 gap-4">
       <div class="col-span-2 bg-white rounded-2xl p-5 border border-ink-100 shadow-card">
         <div class="flex items-center justify-between mb-4">
@@ -288,6 +305,7 @@ const trendOption = computed(() => {
       </div>
     </div>
 
+    <!-- 30 天趋势 -->
     <div class="bg-white rounded-2xl p-5 border border-ink-100 shadow-card">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-semibold text-ink-800">近 30 天拜访趋势</h3>
