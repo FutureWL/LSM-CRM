@@ -34,7 +34,9 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'pnpm dev',
+      // 显式传 VITE_API_PROXY_TARGET (避免 vite 默认 proxy target 走 'localhost' 在 CI runner 上出问题)
+      // 加 DEBUG=vite:proxy 看 proxy 是否生效
+      command: 'VITE_API_PROXY_TARGET=http://127.0.0.1:33501 DEBUG=vite:proxy pnpm dev',
       url: 'http://127.0.0.1:33500',
       timeout: 30_000,
       reuseExistingServer: !process.env.CI,
