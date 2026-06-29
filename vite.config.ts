@@ -38,7 +38,9 @@ export default defineConfig(({ mode }) => {
       // 这要求 VITE_API_BASE_URL 设为相对路径（见下方 setApiBaseUrl 逻辑）
       proxy: {
         '/api': {
-          target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:33501',
+          // 用 127.0.0.1 而不是 localhost (在 GitHub Actions runner 上 localhost 解析问题,
+          // 也会导致 vite proxy 静默失败). 本地开发也 127.0.0.1 OK.
+          target: process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:33501',
           changeOrigin: true,
           // 可选：把后端的 Set-Cookie 转发回来（cookie 已经是 sameSite=lax，localhost 同源不需要）
           // secure: false  // dev 模式不走 https
