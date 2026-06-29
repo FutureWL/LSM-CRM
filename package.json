@@ -8,6 +8,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
+    "test": "vitest run",
     "prod:init": "powershell -ExecutionPolicy Bypass -File deploy/scripts/init-prod.ps1",
     "prod:deploy": "powershell -ExecutionPolicy Bypass -File deploy/scripts/deploy-prod.ps1",
     "prod:up": "powershell -ExecutionPolicy Bypass -File deploy/scripts/prod-up.ps1",
@@ -52,6 +53,7 @@
     "tailwindcss": "^3.4.13",
     "typescript": "~5.6.2",
     "vite": "^5.4.8",
+    "vitest": "^2.1.9",
     "vue-tsc": "^2.1.6"
   }
 }

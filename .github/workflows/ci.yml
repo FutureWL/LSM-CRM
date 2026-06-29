@@ -1,0 +1,102 @@
+# =============================================================================
+# LSM-CRM CI
+# =============================================================================
+# jobs:
+#   1. backend-test:  起 postgres 容器 -> migrate + seed -> bun test
+#   2. frontend-check: type-check + vitest + build
+#
+# 注意: 不跑 e2e (e2e 慢且需要完整 dev 环境, 留给本地手动跑)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # -------------------------------------------------------------------
+  # 后端: bun test (需要 PG)
+  # -------------------------------------------------------------------
+  backend-test:
+    name: backend / bun test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: lsm_crm
+          POSTGRES_PASSWORD: lsm_crm_ci
+          POSTGRES_DB: lsm_crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lsm_crm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://lsm_crm:lsm_crm_ci@localhost:5432/lsm_crm
+      SESSION_SECRET: ci-only-not-for-production-32bytes
+      PORT: '33501'
+      LOG_LEVEL: info
+      COOKIE_INSECURE: '1'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deps
+        working-directory: apps/api
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        working-directory: apps/api
+        run: bun run type-check
+
+      - name: Migrate
+        working-directory: apps/api
+        run: bun run db:migrate
+
+      - name: Seed (full)
+        working-directory: apps/api
+        run: bun run db:seed -- --full
+
+      - name: Run tests
+        working-directory: apps/api
+        run: bun run test
+
+  # -------------------------------------------------------------------
+  # 前端: type-check + vitest + build
+  # -------------------------------------------------------------------
+  frontend-check:
+    name: frontend / type-check + test + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

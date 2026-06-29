@@ -8,6 +8,7 @@
     "build": "bun build src/main.ts --target=bun --outdir=dist --minify",
     "start": "bun run dist/main.js",
     "type-check": "tsc --noEmit",
+    "test": "bun test src/test/",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/seed/index.ts"
